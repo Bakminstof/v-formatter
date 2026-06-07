@@ -98,7 +98,6 @@ class MainWindow(QMainWindow):
         self.version_worker: VersionCheckWorker
 
         self._prepare_worker: PrepareUpdateWorker
-        self._pending_update: tuple | None = None
 
         self.format_widget: FormatSelectorWidget
         self.elapsed_time_widget: ElapsedTimeWidget
@@ -283,11 +282,10 @@ class MainWindow(QMainWindow):
 
     def _on_update_prepared(self, entrypoint_file: Path) -> None:
         self._progress_dialog.close()
-        version_tag, switch_only = self._pending_update
         self.__git_updater.launch_updater_and_exit(
             entrypoint_file,
-            version_tag,
-            switch_only,
+            self._prepare_worker.version,
+            self._prepare_worker.switch_only,
         )
 
     def _on_update_prepare_error(self, error_msg: str) -> None:
@@ -298,12 +296,9 @@ class MainWindow(QMainWindow):
 
     def _cancel_update_preparation(self) -> None:
         self._progress_dialog.close()
-        self._pending_update = None
 
     # ---------- Worker control ----------
     def _launch_updater(self, version_tag: str, switch_only: bool = False) -> None:
-        self._pending_update = (version_tag, switch_only)
-
         self._progress_dialog = QProgressDialog(
             "Подготовка обновления...",
             "Отмена",
@@ -318,7 +313,11 @@ class MainWindow(QMainWindow):
         self._progress_dialog.canceled.connect(self._cancel_update_preparation)
         self._progress_dialog.show()
 
-        self._prepare_worker = PrepareUpdateWorker(self.__git_updater)
+        self._prepare_worker = PrepareUpdateWorker(
+            self.__git_updater,
+            version_tag,
+            switch_only,
+        )
         self._prepare_worker.finished.connect(self._on_update_prepared)
         self._prepare_worker.error.connect(self._on_update_prepare_error)
 
