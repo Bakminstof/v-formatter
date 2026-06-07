@@ -11,15 +11,16 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from ui.models import Lang
 
 APP_NAME = "VFormatter"
+DEFAULT_ENCODING = "utf-8"
 
 BASE_DIR = Path(__file__).parent.parent.resolve()
-
-DEFAULT_ENCODING = "utf-8"
 
 LOGS_DIR = BASE_DIR.parent / "logs"
 BINARIES_DIR = BASE_DIR.parent / "binaries"
 MEDIA_DATA_DIR = BASE_DIR.parent / "media"
 TOOLS_DIR = BASE_DIR.parent / "tools"
+TMP_DIR = Path(gettempdir()).resolve(True) / APP_NAME
+TMP_DIR.mkdir(exist_ok=True, parents=True)
 
 LOCAL_DATA_DIR = BASE_DIR.parent / "local"
 DB_DIR = LOCAL_DATA_DIR / "db"
@@ -83,22 +84,14 @@ class UISettings(BaseModel):
     icon_path: Path = MEDIA_DATA_DIR / "icon.png"
 
 
+class UpdatesSettings(BaseModel):
+    updater_tmp_dir: Path = TMP_DIR / "updates"
+
+    tools_tmp_dir: Path = TMP_DIR / "tools"
+
 class ToolsSettings(BaseModel):
     portable_git_base_dir: Path = TOOLS_DIR / "PortableGit"
 
-    git: Path = portable_git_base_dir / "bin" / "git.exe"
-    git_lfs: Path = portable_git_base_dir / "bin" / "git-lfs.exe"
-
-    @field_validator("portable_git_base_dir")
-    @classmethod
-    def db_path_validator(cls, v: Path) -> Path:
-        v = v.resolve()
-        v_str = v.absolute().as_posix()
-
-        if v_str not in path:
-            path.append(v_str)
-
-        return v
 
 
 class Settings(BaseSettings):
@@ -122,7 +115,7 @@ class Settings(BaseSettings):
 
     default_encoding: str = DEFAULT_ENCODING
 
-    default_temp_dir: Path = Path(gettempdir()).resolve(True) / APP_NAME
+    default_temp_dir: Path = TMP_DIR
 
     source_list_filename: str = "list.txt"
     ignore: set[str] = {".gitkeep"}
@@ -136,6 +129,7 @@ class Settings(BaseSettings):
     ui: UISettings = UISettings()
     db: DBSettings = DBSettings()
     tools: ToolsSettings = ToolsSettings()
+    updates: UpdatesSettings = UpdatesSettings()
 
 
 settings = Settings()
