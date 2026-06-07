@@ -4,12 +4,13 @@
 .DESCRIPTION
     Waits for the main application to exit, fetches the latest tags, checks out the specified tag,
     cleans the working directory, pulls Git LFS files if available, and restarts the application.
+    All log messages are written to both the console and a file in the repository's logs folder.
 .PARAMETER RepoPath
     Path to the local Git repository.
 .PARAMETER GitBin
     Path to the Git executable. Default is 'git'.
 .PARAMETER GitLfsBin
-    Path to the Git LFS executable
+    Path to the Git LFS executable (optional). If not provided, the script will try to detect it.
 .PARAMETER TargetTag
     Target tag to checkout (e.g., v1.2.3).
 .PARAMETER MainScript
@@ -49,11 +50,22 @@ param(
     [object[]]$RemainingArguments
 )
 
-# Function to write log messages with timestamp
+# Prepare log file in the repository's logs folder
+$LogDir = Join-Path $RepoPath "logs"
+if (-not (Test-Path $LogDir)) {
+    New-Item -ItemType Directory -Path $LogDir -Force | Out-Null
+}
+$LogFile = Join-Path $LogDir ("updater_" + (Get-Date -Format "yyyyMMdd_HHmmss") + ".log")
+
+# Function to write log messages to both console and file
 function Write-Log {
     param([string]$Message)
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    Write-Host "[$timestamp] $Message"
+    $fullMessage = "[$timestamp] $Message"
+    # Console output
+    Write-Host $fullMessage
+    # File output
+    Add-Content -Path $LogFile -Value $fullMessage
 }
 
 # Function to run a command and check for errors
@@ -87,6 +99,7 @@ function Invoke-CommandSafe {
 
 # Main script starts here
 Write-Log "Updater started."
+Write-Log "Log file: $LogFile"
 
 # 1. Wait for the main process to exit
 Write-Log "Waiting $Timeout seconds before starting the update..."
@@ -143,9 +156,10 @@ catch {
 
 if ($lfsAvailable) {
     Write-Log "Git LFS detected, pulling LFS objects..."
+    $lfsExecutable = if ($GitLfsBin) { $GitLfsBin } else { "git-lfs" }
     try {
-        Invoke-CommandSafe -Command @($GitLfsBin, "pull") -WorkingDirectory $RepoPath
-        Invoke-CommandSafe -Command @($GitLfsBin, "prune", "--force") -WorkingDirectory $RepoPath
+        Invoke-CommandSafe -Command @($GitBin, "lfs", "pull") -WorkingDirectory $RepoPath
+        Invoke-CommandSafe -Command @($GitBin, "lfs", "prune", "--force") -WorkingDirectory $RepoPath
     }
     catch {
         Write-Log "WARNING: Git LFS pull/prune failed (possibly LFS is not fully configured)."
