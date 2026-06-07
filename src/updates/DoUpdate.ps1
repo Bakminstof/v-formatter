@@ -136,11 +136,9 @@ try {
 if ($lfsAvailable) {
     Write-Log "Git LFS detected, pulling LFS objects..."
     Invoke-CommandSafe -Command @($GitBin, "lfs", "pull") -WorkingDirectory $RepoPath
-    Invoke-CommandSafe -Command @($GitBin, "lfs", "prune", "--force") -WorkingDirectory $RepoPath
 } elseif (-not [string]::IsNullOrEmpty($GitLfsBin) -and (Test-Path $GitLfsBin)) {
     Write-Log "Using explicit Git LFS binary, pulling LFS objects..."
     Invoke-CommandSafe -Command @($GitLfsBin, "pull") -WorkingDirectory $RepoPath
-    Invoke-CommandSafe -Command @($GitLfsBin, "prune", "--force") -WorkingDirectory $RepoPath
 } else {
     Write-Log "Git LFS not available, skipping LFS operations."
 }
