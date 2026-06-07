@@ -1,0 +1,77 @@
+from pathlib import Path
+from sys import argv, path
+
+ROOT_DIR = Path(__file__).parent.resolve()
+ROOT_DIR_PATH_STR = ROOT_DIR.absolute().as_posix()
+
+if ROOT_DIR_PATH_STR not in path:
+    path.append(ROOT_DIR_PATH_STR)
+
+from loguru import logger
+
+from PySide6.QtWidgets import QApplication
+
+from core.utils import startup, parse_args
+from ui.main_window import MainWindow
+from core.concatenator import VideoConcatenator
+from core.database import VideoRegistry
+from core.meta import VideoMetaProcessor
+from core.settings import settings
+
+
+def main() -> None:
+    args = parse_args()
+
+    startup(
+        settings.i18n.default_locale,
+        rotation=settings.logging.rotation,
+        retention=settings.logging.retention,
+        compression=settings.logging.compression,
+        file_format=settings.logging.file_format,
+        encoding=settings.default_encoding,
+        console_format=settings.logging.console_format,
+        verbose=args.verbose,
+        log_file=settings.logging.file_path,
+    )
+
+    registry = VideoRegistry(settings.db.path)
+    registry.init_db()
+
+    meta_processor = VideoMetaProcessor(settings.ffprobe, registry)
+    video_concatenator = VideoConcatenator(
+        settings.ffmpeg,
+        settings.source_list_filename,
+        settings.default_encoding,
+        settings.ignore,
+    )
+
+    app = QApplication(argv)
+
+    window = MainWindow(
+        settings.ui.icon_path,
+        settings.default_temp_dir,
+        settings.default_encoding,
+        settings.i18n.default_locale,
+        settings.i18n.locales_dir,
+        settings.local.meta_file_path,
+        app_info=settings.app_info,
+        video_concatenator=video_concatenator,
+        meta_processor=meta_processor,
+        registry=registry,
+    )
+    window.show()
+
+    exit_code = app.exec()
+
+    if exit_code != 0:
+        logger.error("Application exited with code {d}", exit_code)
+    else:
+        logger.info("Application exited successfully")
+
+    registry.close()
+
+    exit(exit_code)
+
+
+if __name__ == "__main__":
+    main()

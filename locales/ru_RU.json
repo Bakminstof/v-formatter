@@ -1,0 +1,14 @@
+{
+  "input_dir": "📂 Исходная папка",
+  "output_dir": "📁 Папка результата",
+  "start": "▶️ Запуск",
+  "stop": "⏹ Остановить",
+  "queue": "📋 Очередь",
+  "progress": "📊 Прогресс",
+  "logs": "🧾 Вывод",
+  "format": "🎞 Формат видео",
+  "elapsed_time": "⏱ Затрачено:",
+  "time_filter": "⏱ Фильтр по времени",
+  "time_filter_label_time_from": "с",
+  "time_filter_label_time_to": "по"
+}
