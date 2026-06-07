@@ -1,12 +1,22 @@
+from os import environ as env
 from pathlib import Path
 from sys import argv, path
 
 ROOT_DIR = Path(__file__).parent.resolve()
+
 REPOSITORY_ROOT = ROOT_DIR.parent
 ROOT_DIR_PATH_STR = ROOT_DIR.absolute().as_posix()
 
-if ROOT_DIR_PATH_STR not in path:
-    path.append(ROOT_DIR_PATH_STR)
+GIT_PYTHON_GIT_EXECUTABLE_STR = (
+    (REPOSITORY_ROOT / "tools" / "PortableGit" / "bin" / "git.exe")
+    .resolve(True)
+    .absolute()
+    .as_posix()
+)
+
+env["GIT_PYTHON_GIT_EXECUTABLE"] = GIT_PYTHON_GIT_EXECUTABLE_STR
+
+path.append(ROOT_DIR_PATH_STR)
 
 from loguru import logger
 from PySide6.QtWidgets import QApplication

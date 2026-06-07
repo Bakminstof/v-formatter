@@ -9,15 +9,15 @@ from pydantic import BaseModel, ConfigDict, field_validator
 
 
 class Lang(StrEnum):
-    ru_RU: str = "ru_RU"
+    ru_RU = "ru_RU"
 
 
 class Status(StrEnum):
-    waiting: str = "⏳"
-    processing: str = "⚙️"
-    done: str = "✅"
-    error: str = "❌"
-    unknown: str = "❓"
+    waiting = "⏳"
+    processing = "⚙️"
+    done = "✅"
+    error = "❌"
+    unknown = "❓"
 
 
 LOG_COLORS = {

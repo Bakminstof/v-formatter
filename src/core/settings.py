@@ -1,6 +1,5 @@
 from functools import cached_property
 from pathlib import Path
-from sys import path
 from tempfile import gettempdir
 
 from pydantic import BaseModel, ConfigDict, computed_field, field_validator
