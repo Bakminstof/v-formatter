@@ -40,12 +40,13 @@ def setup_logging(
 
     level = "DEBUG" if verbose else "INFO"
 
-    logger.add(
-        sys.stdout,
-        level=level,
-        colorize=True,
-        format=console_format,
-    )
+    if sys.stdout and hasattr(sys.stdout, "fileno"):
+        logger.add(
+            sys.stdout,
+            level=level,
+            colorize=True,
+            format=console_format,
+        )
 
     if log_file:
         log_path = Path(log_file)
