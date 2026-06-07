@@ -7,15 +7,13 @@ ROOT_DIR = Path(__file__).parent.resolve()
 REPOSITORY_ROOT = ROOT_DIR.parent
 ROOT_DIR_PATH_STR = ROOT_DIR.absolute().as_posix()
 
-GIT_PYTHON_GIT_EXECUTABLE_STR = (
-    (REPOSITORY_ROOT / "tools" / "PortableGit" / "bin" / "git.exe")
-    .resolve(True)
-    .absolute()
-    .as_posix()
-)
+GIT_DIR = REPOSITORY_ROOT / "tools" / "PortableGit" / "cmd"
+GIT_DIR_STR = GIT_DIR.absolute().as_posix()
+GIT_PYTHON_GIT_EXECUTABLE_STR = (GIT_DIR / "git.exe").resolve(True).absolute().as_posix()
 
 env["GIT_PYTHON_GIT_EXECUTABLE"] = GIT_PYTHON_GIT_EXECUTABLE_STR
 
+path.append(GIT_DIR_STR)
 path.append(ROOT_DIR_PATH_STR)
 
 from loguru import logger
