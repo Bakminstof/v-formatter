@@ -6,11 +6,13 @@ from subprocess import CREATE_NEW_PROCESS_GROUP, Popen
 from sys import platform
 
 import git
+import humanize
 import requests
 from loguru import logger
-from packaging.version import Version
+from packaging.version import InvalidVersion, Version
 
 from core import version
+from core.models import VersionsInfoModel
 
 
 class GitUpdater:
@@ -33,6 +35,8 @@ class GitUpdater:
         self.updater_tmp_dir = updater_tmp_dir
         self.tools_tmp_dir = tools_tmp_dir
 
+        self._versions_data: VersionsInfoModel | None = None
+
         try:
             self.repo = git.Repo(repo_path, search_parent_directories=False)
             logger.info("Git-репозиторий обнаружен: {}", repo_path)
@@ -48,16 +52,59 @@ class GitUpdater:
     def is_git_repo(self) -> bool:
         return self.repo is not None
 
+    def startup(self) -> None:
+        latest_version = None
+
+        if self.is_git_repo():
+            current_version = self.get_current_version()
+            all_versions = self.get_all_version_tags()
+            latest_version, _ = self._get_latest_release()
+        else:
+            current_version = version
+            all_versions = [version]
+
+        self._versions_data = VersionsInfoModel(
+            current=current_version,
+            latest=latest_version or "unknown",
+            all=all_versions,
+        )
+
+    @property
+    def versions_data(self) -> VersionsInfoModel | None:
+        return self._versions_data
+
+    def get_all_version_tags(self) -> list[str]:
+        if not self.is_git_repo():
+            return []
+
+        all_tags = [tag.name for tag in self.repo.tags]
+        version_tags = []
+
+        for tag in all_tags:
+            clean = tag.lstrip("v")
+            try:
+                Version(clean)
+                version_tags.append(tag)
+            except InvalidVersion:
+                continue
+
+        return sorted(
+            version_tags,
+            key=lambda t: Version(t.lstrip("v")),
+            reverse=True,
+        )
+
     def get_current_version(self) -> str:
         if not self.is_git_repo():
             return version
+
         try:
             return self.repo.git.describe("--tags", "--exact-match")
         except git.GitCommandError:
             try:
                 return self.repo.head.commit.hexsha[:7]
             except Exception:
-                return "unknown"
+                return version
 
     def _get_latest_release(self) -> tuple[str | None, str | None]:
         url = (
@@ -78,8 +125,8 @@ class GitUpdater:
             logger.info("Обновление невозможно: папка не является Git-репозиторием")
             return False, None, None
 
-        current = self.get_current_version()
-        latest_tag, _ = self._get_latest_release()
+        current = self._versions_data.current
+        latest_tag = self._versions_data.latest
 
         if not latest_tag:
             return False, current, None
@@ -123,34 +170,15 @@ class GitUpdater:
             follow_symlinks=False,
         )
 
+        elapsed = time.monotonic() - start
+
         logger.info(
-            "[{}] Prepare update done at {:.2f}s.",
+            "[{}] Prepare update done at {}",
             self,
-            time.monotonic() - start,
+            humanize.precisedelta(elapsed),
         )
 
         return update_entrypoint_file
-
-    def perform_update(self) -> bool:
-        has_update, _, new_tag = self.check_for_update()
-
-        if not has_update:
-            logger.info("Обновление не требуется")
-            return True
-
-        logger.info("Начинаю обновление до тега '{}'", new_tag)
-
-        try:
-            origin = self.repo.remotes.origin
-            origin.fetch(tags=True)
-            logger.debug("Теги получены")
-
-            self.repo.git.checkout(f"tags/{new_tag}")
-            logger.success("Репозиторий переключён на тег '{}'", new_tag)
-            return True
-        except Exception as e:
-            logger.error("Ошибка при обновлении: {}", e)
-            return False
 
     @staticmethod
     def _is_valid_semver_tag(tag: str) -> bool:
@@ -164,6 +192,7 @@ class GitUpdater:
         self,
         update_entrypoint_file: Path,
         target_tag: str,
+        switch_only: bool = False,
     ) -> None:
         if platform == "win32":
             creationflags = CREATE_NEW_PROCESS_GROUP
@@ -173,51 +202,38 @@ class GitUpdater:
         git_bin = self.tools_tmp_dir / self.portable_git_base_dir.name / "bin" / "git.exe"
         git_lfs_bin = self.tools_tmp_dir / self.portable_git_base_dir.name / "bin" / "git-lfs.exe"
 
-        p = Popen(
-            [
-                "powershell",
-                "-executionpolicy",
-                "bypass",
-                "-file",
-                update_entrypoint_file,
-                "-RepoPath",
-                self.repo_path,
-                "-GitBin",
-                git_bin,
-                "-GitLfsBin",
-                git_lfs_bin,
-                "-TargetTag",
-                target_tag,
-                "-Python",
-                sys.executable,
-                "-MainScript",
-                sys.argv[0],
-            ],
+        args = [
+            "powershell",
+            "-executionpolicy",
+            "bypass",
+            "-file",
+            update_entrypoint_file,
+            "-RepoPath",
+            self.repo_path,
+            "-GitBin",
+            git_bin,
+            "-GitLfsBin",
+            git_lfs_bin,
+            "-TargetTag",
+            target_tag,
+            "-Python",
+            sys.executable,
+            "-MainScript",
+            sys.argv[0],
+        ]
+
+        if switch_only:
+            args.append("-SwitchOnly")
+
+        if len(sys.argv) > 1:
+            args.append("--")
+            args.extend(sys.argv[1:])
+
+        Popen(
+            args,
             shell=True,
             creationflags=creationflags,
             close_fds=True,
         )
-        print(
-            " ".join(
-                [
-                    "powershell",
-                    "-executionpolicy",
-                    "bypass",
-                    "-file",
-                    update_entrypoint_file.as_posix(),
-                    "-RepoPath",
-                    self.repo_path.as_posix(),
-                    "-GitBin",
-                    git_bin.as_posix(),
-                    "-GitLfsBin",
-                    git_lfs_bin.as_posix(),
-                    "-TargetTag",
-                    target_tag,
-                    "-Python",
-                    sys.executable,
-                    "-MainScript",
-                    sys.argv[0],
-                ]
-            )
-        )
+
         exit(0)

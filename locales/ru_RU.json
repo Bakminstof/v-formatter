@@ -10,5 +10,8 @@
   "elapsed_time": "⏱ Затрачено:",
   "time_filter": "⏱ Фильтр по времени",
   "time_filter_label_time_from": "с",
-  "time_filter_label_time_to": "по"
+  "time_filter_label_time_to": "по",
+  "update_do": "Обновить",
+  "app_current_version": "Текущая версия",
+  "app_all_versions": "Доступные версии"
 }

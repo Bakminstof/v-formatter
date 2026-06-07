@@ -22,3 +22,9 @@ class VideoMetaModel(BaseModel):
     duration: float
     error: str | None = None
     processed_at: datetime = datetime.now()
+
+
+class VersionsInfoModel(BaseModel):
+    current: str
+    latest: str = "unknown"
+    all: list[str]

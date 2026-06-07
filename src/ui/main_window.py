@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QListWidget,
     QMainWindow,
+    QMessageBox,
     QProgressBar,
     QPushButton,
     QVBoxLayout,
@@ -19,7 +20,7 @@ from PySide6.QtWidgets import (
 from core.concatenator import VideoConcatenator, VideosStructureModel
 from core.database import VideoRegistry
 from core.meta import VideoMetaProcessor
-from core.models import AppInfoModel
+from core.models import AppInfoModel, VersionsInfoModel
 from ui.i18n import I18n, get_windows_ui_language
 from ui.models import Lang, LocalMetaModel, Status
 from ui.settings import load_local_meta, save_local_meta
@@ -28,7 +29,10 @@ from ui.widgets.elapsed_time import ElapsedTimeWidget
 from ui.widgets.format_selector import FormatSelectorWidget
 from ui.widgets.log_widget import LogWidget, QtLogHandler
 from ui.widgets.time_interval import TimeIntervalWidget
+from ui.widgets.version_widget import VersionWidget
 from ui.workers.directory_worker import Worker
+from ui.workers.version_worker import VersionCheckWorker
+from updates.git_updater import GitUpdater
 
 
 class MainWindow(QMainWindow):
@@ -42,6 +46,7 @@ class MainWindow(QMainWindow):
         local_meta_file_path: Path,
         *,
         app_info: AppInfoModel,
+        git_updater: GitUpdater,
         video_concatenator: VideoConcatenator,
         meta_processor: VideoMetaProcessor,
         registry: VideoRegistry,
@@ -52,6 +57,7 @@ class MainWindow(QMainWindow):
         self.__temp_dir = temp_dir
         self.__encoding = encoding
 
+        self.__git_updater = git_updater
         self.video_concatenator = video_concatenator
         self.meta_processor = meta_processor
         self.registry = registry
@@ -84,6 +90,8 @@ class MainWindow(QMainWindow):
         )
 
         self.worker: Worker
+        self.version_worker: VersionCheckWorker
+
         self.format_widget: FormatSelectorWidget
         self.elapsed_time_widget: ElapsedTimeWidget
         self.time_filter_widget: TimeIntervalWidget
@@ -91,6 +99,7 @@ class MainWindow(QMainWindow):
         # --- Initialize UI ---
         self.input_dir_widget: DirSelectorWidget
         self.output_dir_widget: DirSelectorWidget
+        self.version_widget: VersionWidget
 
         self._init_window()
 
@@ -104,6 +113,7 @@ class MainWindow(QMainWindow):
         self._init_format_selector()
         self._init_elapsed_time_widget()
         self._init_time_filter_widget()
+        self._init_version_widget()
         self._init_layout()
 
     # ---------- UI Initialization ----------
@@ -161,8 +171,23 @@ class MainWindow(QMainWindow):
             self.local_meta.filters.time.time_to,
         )
 
+    def _init_version_widget(self) -> None:
+        self.version_widget = VersionWidget(
+            self.i18n.t("app_current_version"),
+            self.i18n.t("update_do"),
+            self.i18n.t("app_all_versions"),
+        )
+        self.version_widget.update_requested.connect(self._on_update_requested)
+        self.version_widget.switch_version_requested.connect(self._on_switch_version_requested)
+        self._refresh_version_model()
+
     def _init_layout(self):
         layout = QVBoxLayout()
+
+        top_layout = QHBoxLayout()
+        top_layout.addStretch(1)
+        top_layout.addWidget(self.version_widget)
+        layout.addLayout(top_layout)
 
         # --- Directory selectors ---
         layout.addWidget(QLabel(self.i18n.t("input_dir")))
@@ -199,7 +224,6 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(container)
 
     # ---------- Callbacks ----------
-
     def _on_input_dir_changed(self, path: Path) -> None:
         self.local_meta.input_dir = path
         save_local_meta(
@@ -224,7 +248,56 @@ class MainWindow(QMainWindow):
             encoding=self.__encoding,
         )
 
+    def _on_update_requested(self) -> None:
+        latest = self.__git_updater.versions_data.latest
+
+        if not latest:
+            logger.warning("Не удалось определить последнюю версию.")
+            QMessageBox.warning(
+                self,
+                "Ошибка",
+                "Не удалось получить информацию о последней версии.",
+            )
+            return
+
+        self._launch_updater(latest)
+
+    def _on_switch_version_requested(self, version_tag: str) -> None:
+        reply = QMessageBox.question(
+            self,
+            "Переключение версии",
+            f"Вы действительно хотите переключиться на версию {version_tag}?\n"
+            "Приложение будет перезапущено.",
+            QMessageBox.Yes | QMessageBox.No,
+        )
+        if reply == QMessageBox.Yes:
+            self._launch_updater(version_tag, switch_only=True)
+
     # ---------- Worker control ----------
+    def _launch_updater(self, version_tag: str, switch_only: bool = False) -> None:
+        update_entrypoint_file = self.__git_updater.prepare_update()
+        self.__git_updater.launch_updater_and_exit(
+            update_entrypoint_file,
+            version_tag,
+            switch_only,
+        )
+
+    def _start_background_version_check(self) -> None:
+        self.version_worker = VersionCheckWorker(self.__git_updater)
+
+        self.version_worker.finished.connect(self._on_version_data_ready)
+        self.version_worker.error.connect(self._on_version_check_error)
+
+        self.version_worker.start()
+
+    def _on_version_data_ready(self, model: VersionsInfoModel) -> None:
+        self.version_widget.set_model(model)
+        self.version_worker.quit()
+
+    def _on_version_check_error(self, error_msg: str) -> None:
+        """Логирует ошибку и завершает поток."""
+        logger.error("Не удалось проверить версии: {}", error_msg)
+        self.version_worker.quit()
 
     def _save_current_meta(self) -> None:
         input_dir = Path(self.input_dir_widget.get_path())
@@ -246,6 +319,12 @@ class MainWindow(QMainWindow):
             self.local_meta_file_path,
             encoding=self.__encoding,
         )
+
+    def _refresh_version_model(self) -> None:
+        if hasattr(self, "version_worker") and self.version_worker.isRunning():
+            return
+
+        self._start_background_version_check()
 
     def start(self) -> None:
         self._save_current_meta()

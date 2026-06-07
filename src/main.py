@@ -2,6 +2,7 @@ from pathlib import Path
 from sys import argv, path
 
 ROOT_DIR = Path(__file__).parent.resolve()
+REPOSITORY_ROOT = ROOT_DIR.parent
 ROOT_DIR_PATH_STR = ROOT_DIR.absolute().as_posix()
 
 if ROOT_DIR_PATH_STR not in path:
@@ -16,6 +17,7 @@ from core.meta import VideoMetaProcessor
 from core.settings import settings
 from core.utils import parse_args, startup
 from ui.main_window import MainWindow
+from updates.git_updater import GitUpdater
 
 
 def main() -> None:
@@ -43,6 +45,14 @@ def main() -> None:
         settings.default_encoding,
         settings.ignore,
     )
+    updater = GitUpdater(
+        repo_path=REPOSITORY_ROOT,
+        github_owner="Bakminstof",
+        github_repo="v-formatter",
+        portable_git_base_dir=settings.tools.portable_git_base_dir,
+        updater_tmp_dir=settings.updates.updater_tmp_dir,
+        tools_tmp_dir=settings.updates.tools_tmp_dir,
+    )
 
     app = QApplication(argv)
 
@@ -57,6 +67,7 @@ def main() -> None:
         video_concatenator=video_concatenator,
         meta_processor=meta_processor,
         registry=registry,
+        git_updater=updater,
     )
     window.show()
 

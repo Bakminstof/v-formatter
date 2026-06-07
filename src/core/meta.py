@@ -1,9 +1,11 @@
+import time
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from json import loads
 from pathlib import Path
 from typing import Iterable
 
+import humanize
 from loguru import logger
 
 from core.database import VideoRegistry
@@ -49,6 +51,10 @@ class VideoMetaProcessor:
             self._update(item)
 
     def update_meta_bulk(self, items: Iterable[Path]) -> None:
+        logger.info("[{}] Start indexing", self)
+
+        start = time.monotonic()
+
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             futures: list[Future[None]] = []
 
@@ -60,6 +66,14 @@ class VideoMetaProcessor:
                     future.result()
                 except Exception as e:
                     logger.error("[{}]: {}", self, str(e))
+
+        elapsed = time.monotonic() - start
+
+        logger.info(
+            "[{}] Finish indexing at {:.2f}",
+            self,
+            humanize.precisedelta(elapsed),
+        )
 
     def load_video_meta(self, video_path: Path) -> VideoMetaModel:
         args = [

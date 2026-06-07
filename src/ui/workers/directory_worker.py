@@ -94,3 +94,4 @@ class Worker(QThread):
             self._process.kill()
 
         self._process = None
+        self.quit()

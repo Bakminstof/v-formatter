@@ -44,6 +44,8 @@ param(
 
     [int]$Timeout = 5,
 
+    [switch]$SwitchOnly = $false,
+
     [Parameter(ValueFromRemainingArguments = $true)]
     [object[]]$RemainingArguments
 )
@@ -119,7 +121,9 @@ elseif (-not (Test-Path $GitBin)) {
 Write-Log "Using Git: $GitBin"
 
 # 4. Fetch all tags from origin
-Invoke-CommandSafe -Command @($GitBin, "fetch", "--tags") -WorkingDirectory $RepoPath
+if (-not $SwitchOnly) {
+    Invoke-CommandSafe -Command @($GitBin, "fetch", "--tags") -WorkingDirectory $RepoPath
+}
 
 # 5. Checkout the target tag (force, clean, reset)
 Invoke-CommandSafe -Command @($GitBin, "checkout", "-f", "tags/$TargetTag") -WorkingDirectory $RepoPath
@@ -127,20 +131,22 @@ Invoke-CommandSafe -Command @($GitBin, "clean", "-fd") -WorkingDirectory $RepoPa
 Invoke-CommandSafe -Command @($GitBin, "reset", "--hard") -WorkingDirectory $RepoPath
 
 # 6. Handle Git LFS (Исправленная логика)
-$lfsAvailable = $false
-try {
-    $lfsCheck = Start-Process -FilePath $GitBin -ArgumentList "lfs","version" -NoNewWindow -Wait -PassThru
-    $lfsAvailable = ($lfsCheck.ExitCode -eq 0)
-} catch { }
+if (-not $SwitchOnly) {
+    $lfsAvailable = $false
+    try {
+        $lfsCheck = Start-Process -FilePath $GitBin -ArgumentList "lfs","version" -NoNewWindow -Wait -PassThru
+        $lfsAvailable = ($lfsCheck.ExitCode -eq 0)
+    } catch { }
 
-if ($lfsAvailable) {
-    Write-Log "Git LFS detected, pulling LFS objects..."
-    Invoke-CommandSafe -Command @($GitBin, "lfs", "pull") -WorkingDirectory $RepoPath
-} elseif (-not [string]::IsNullOrEmpty($GitLfsBin) -and (Test-Path $GitLfsBin)) {
-    Write-Log "Using explicit Git LFS binary, pulling LFS objects..."
-    Invoke-CommandSafe -Command @($GitLfsBin, "pull") -WorkingDirectory $RepoPath
-} else {
-    Write-Log "Git LFS not available, skipping LFS operations."
+    if ($lfsAvailable) {
+        Write-Log "Git LFS detected, pulling LFS objects..."
+        Invoke-CommandSafe -Command @($GitBin, "lfs", "pull") -WorkingDirectory $RepoPath
+    } elseif (-not [string]::IsNullOrEmpty($GitLfsBin) -and (Test-Path $GitLfsBin)) {
+        Write-Log "Using explicit Git LFS binary, pulling LFS objects..."
+        Invoke-CommandSafe -Command @($GitLfsBin, "pull") -WorkingDirectory $RepoPath
+    } else {
+        Write-Log "Git LFS not available, skipping LFS operations."
+    }
 }
 
 # 7. Extract original arguments for the main application
