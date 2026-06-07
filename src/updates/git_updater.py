@@ -120,38 +120,9 @@ class GitUpdater:
             logger.error("Ошибка при запросе последнего релиза: {}", e)
             return None, None
 
-    def check_for_update(self) -> tuple[bool, str | None, str | None]:
-        if not self.is_git_repo():
-            logger.info("Обновление невозможно: папка не является Git-репозиторием")
-            return False, None, None
-
-        current = self._versions_data.current
-        latest_tag = self._versions_data.latest
-
-        if not latest_tag:
-            return False, current, None
-
-        if current is None:
-            return False, None, None
-
-        if not self._is_valid_semver_tag(current):
-            logger.info(
-                "Текущая версия '{}' не является релизным тегом, " "предлагаем обновление до '{}'",
-                current,
-                latest_tag,
-            )
-            return True, current, latest_tag
-
-        cur_ver = current.lstrip("v")
-        latest_ver = latest_tag.lstrip("v")
-
-        try:
-            has_update = Version(latest_ver) > Version(cur_ver)
-        except Exception:
-            has_update = latest_tag != current
-
-        new_version = latest_tag if has_update else None
-        return has_update, current, new_version
+    def _update(self) -> None:
+        self.repo.remote("origin").fetch(tags=True)
+        self.repo.git.lfs("pull")
 
     def prepare_update(self) -> Path:
         logger.debug("[{}] Prepare updates start", self)
@@ -178,15 +149,9 @@ class GitUpdater:
             humanize.precisedelta(elapsed),
         )
 
-        return update_entrypoint_file
+        self._update()
 
-    @staticmethod
-    def _is_valid_semver_tag(tag: str) -> bool:
-        tag = tag.lstrip("v")
-        parts = tag.split(".")
-        if len(parts) < 2:
-            return False
-        return all(p.isdigit() for p in parts)
+        return update_entrypoint_file
 
     def launch_updater_and_exit(
         self,
@@ -200,7 +165,6 @@ class GitUpdater:
             creationflags = 0
 
         git_bin = self.tools_tmp_dir / self.portable_git_base_dir.name / "bin" / "git.exe"
-        git_lfs_bin = self.tools_tmp_dir / self.portable_git_base_dir.name / "bin" / "git-lfs.exe"
 
         args = [
             "powershell",
@@ -212,8 +176,6 @@ class GitUpdater:
             self.repo_path,
             "-GitBin",
             git_bin,
-            "-GitLfsBin",
-            git_lfs_bin,
             "-TargetTag",
             target_tag,
             "-Python",
@@ -229,11 +191,6 @@ class GitUpdater:
             args.append("--")
             args.extend(sys.argv[1:])
 
-        Popen(
-            args,
-            shell=True,
-            creationflags=creationflags,
-            close_fds=True,
-        )
+        Popen(args, shell=True, creationflags=creationflags, close_fds=True)
 
         exit(0)

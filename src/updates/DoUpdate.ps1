@@ -10,8 +10,6 @@
     Path to the local Git repository.
 .PARAMETER GitBin
     Path to the Git executable. Default is 'git'.
-.PARAMETER GitLfsBin
-    Path to the Git LFS executable (optional).
 .PARAMETER TargetTag
     Target tag to checkout (e.g., v1.2.3).
 .PARAMETER MainScript
@@ -39,8 +37,6 @@ param(
     [string]$Python,
 
     [string]$GitBin = "git",
-
-    [string]$GitLfsBin,
 
     [int]$Timeout = 5,
 
@@ -98,11 +94,9 @@ function Invoke-CommandSafe {
 Write-Log "Updater started."
 Write-Log "Log file: $LogFile"
 
-# 1. Wait for the main process to exit
 Write-Log "Waiting $Timeout seconds before starting the update..."
 Start-Sleep -Seconds $Timeout
 
-# 2. Validate repository path
 if (-not (Test-Path -Path $RepoPath -PathType Container)) {
     throw "Repository path '$RepoPath' does not exist."
 }
@@ -110,7 +104,6 @@ if (-not (Test-Path -Path (Join-Path $RepoPath ".git") -PathType Container)) {
     throw "'$RepoPath' is not a Git repository (missing .git directory)."
 }
 
-# 3. Resolve Git executable
 $resolvedGit = Get-Command $GitBin -ErrorAction SilentlyContinue
 if ($resolvedGit) {
     $GitBin = $resolvedGit.Source
@@ -120,36 +113,10 @@ elseif (-not (Test-Path $GitBin)) {
 }
 Write-Log "Using Git: $GitBin"
 
-# 4. Fetch all tags from origin
-if (-not $SwitchOnly) {
-    Invoke-CommandSafe -Command @($GitBin, "fetch", "--tags") -WorkingDirectory $RepoPath
-}
-
-# 5. Checkout the target tag (force, clean, reset)
 Invoke-CommandSafe -Command @($GitBin, "checkout", "-f", "tags/$TargetTag") -WorkingDirectory $RepoPath
 Invoke-CommandSafe -Command @($GitBin, "clean", "-fd") -WorkingDirectory $RepoPath
 Invoke-CommandSafe -Command @($GitBin, "reset", "--hard") -WorkingDirectory $RepoPath
 
-# 6. Handle Git LFS (Исправленная логика)
-if (-not $SwitchOnly) {
-    $lfsAvailable = $false
-    try {
-        $lfsCheck = Start-Process -FilePath $GitBin -ArgumentList "lfs","version" -NoNewWindow -Wait -PassThru
-        $lfsAvailable = ($lfsCheck.ExitCode -eq 0)
-    } catch { }
-
-    if ($lfsAvailable) {
-        Write-Log "Git LFS detected, pulling LFS objects..."
-        Invoke-CommandSafe -Command @($GitBin, "lfs", "pull") -WorkingDirectory $RepoPath
-    } elseif (-not [string]::IsNullOrEmpty($GitLfsBin) -and (Test-Path $GitLfsBin)) {
-        Write-Log "Using explicit Git LFS binary, pulling LFS objects..."
-        Invoke-CommandSafe -Command @($GitLfsBin, "pull") -WorkingDirectory $RepoPath
-    } else {
-        Write-Log "Git LFS not available, skipping LFS operations."
-    }
-}
-
-# 7. Extract original arguments for the main application
 $originalArgs = @()
 if ($RemainingArguments -and $RemainingArguments.Count -gt 0) {
     $separatorIndex = [Array]::IndexOf($RemainingArguments, '--')
@@ -160,7 +127,6 @@ if ($RemainingArguments -and $RemainingArguments.Count -gt 0) {
     }
 }
 
-# 8. Restart the main application
 $cmdArgs = @($Python, $MainScript) + $originalArgs
 $cmdString = $cmdArgs -join " "
 Write-Log "Restarting application: $cmdString"
