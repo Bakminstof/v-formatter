@@ -302,6 +302,8 @@ class MainWindow(QMainWindow):
 
     # ---------- Worker control ----------
     def _launch_updater(self, version_tag: str, switch_only: bool = False) -> None:
+        self._pending_update = (version_tag, switch_only)
+
         self._progress_dialog = QProgressDialog(
             "Подготовка обновления...",
             "Отмена",
@@ -311,21 +313,17 @@ class MainWindow(QMainWindow):
         )
         self._progress_dialog.setWindowTitle("Пожалуйста, подождите")
         self._progress_dialog.setWindowModality(Qt.WindowModal)
-        self._progress_dialog.setMinimumDuration(0)  # показать сразу
+        self._progress_dialog.setMinimumDuration(0)
         self._progress_dialog.setValue(0)
-        # Кнопка отмены пока не обрабатывается (можно добавить отмену при необходимости)
         self._progress_dialog.canceled.connect(self._cancel_update_preparation)
         self._progress_dialog.show()
-
-        # Сохраняем параметры для финального запуска
-        self._pending_update = (version_tag, switch_only)
 
         self._prepare_worker = PrepareUpdateWorker(self.__git_updater)
         self._prepare_worker.finished.connect(self._on_update_prepared)
         self._prepare_worker.error.connect(self._on_update_prepare_error)
 
         self._prepare_worker.start()
-        # Запускаем цикл обработки событий, чтобы диалог мог обновляться
+
         QApplication.processEvents()
 
     def _start_background_version_check(self) -> None:
