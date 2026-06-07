@@ -4,14 +4,17 @@ from typing import Iterator
 
 import humanize
 from loguru import logger
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
+    QApplication,
     QHBoxLayout,
     QLabel,
     QListWidget,
     QMainWindow,
     QMessageBox,
     QProgressBar,
+    QProgressDialog,
     QPushButton,
     QVBoxLayout,
     QWidget,
@@ -31,6 +34,7 @@ from ui.widgets.log_widget import LogWidget, QtLogHandler
 from ui.widgets.time_interval import TimeIntervalWidget
 from ui.widgets.version_widget import VersionWidget
 from ui.workers.directory_worker import Worker
+from ui.workers.prepare_update_worker import PrepareUpdateWorker
 from ui.workers.version_worker import VersionCheckWorker
 from updates.git_updater import GitUpdater
 
@@ -89,8 +93,12 @@ class MainWindow(QMainWindow):
             encoding=self.__encoding,
         )
 
+        # Workers
         self.worker: Worker
         self.version_worker: VersionCheckWorker
+
+        self._prepare_worker: PrepareUpdateWorker
+        self._pending_update: tuple | None = None
 
         self.format_widget: FormatSelectorWidget
         self.elapsed_time_widget: ElapsedTimeWidget
@@ -273,14 +281,52 @@ class MainWindow(QMainWindow):
         if reply == QMessageBox.Yes:
             self._launch_updater(version_tag, switch_only=True)
 
-    # ---------- Worker control ----------
-    def _launch_updater(self, version_tag: str, switch_only: bool = False) -> None:
-        update_entrypoint_file = self.__git_updater.prepare_update()
+    def _on_update_prepared(self, entrypoint_file: Path) -> None:
+        self._progress_dialog.close()
+        version_tag, switch_only = self._pending_update
         self.__git_updater.launch_updater_and_exit(
-            update_entrypoint_file,
+            entrypoint_file,
             version_tag,
             switch_only,
         )
+
+    def _on_update_prepare_error(self, error_msg: str) -> None:
+        """Обрабатывает ошибку подготовки."""
+        self._progress_dialog.close()
+        logger.error("Ошибка подготовки обновления: {}", error_msg)
+        QMessageBox.critical(self, "Ошибка", f"Не удалось подготовить обновление:\n{error_msg}")
+
+    def _cancel_update_preparation(self) -> None:
+        self._progress_dialog.close()
+        self._pending_update = None
+
+    # ---------- Worker control ----------
+    def _launch_updater(self, version_tag: str, switch_only: bool = False) -> None:
+        self._progress_dialog = QProgressDialog(
+            "Подготовка обновления...",
+            "Отмена",
+            0,
+            0,
+            self,
+        )
+        self._progress_dialog.setWindowTitle("Пожалуйста, подождите")
+        self._progress_dialog.setWindowModality(Qt.WindowModal)
+        self._progress_dialog.setMinimumDuration(0)  # показать сразу
+        self._progress_dialog.setValue(0)
+        # Кнопка отмены пока не обрабатывается (можно добавить отмену при необходимости)
+        self._progress_dialog.canceled.connect(self._cancel_update_preparation)
+        self._progress_dialog.show()
+
+        # Сохраняем параметры для финального запуска
+        self._pending_update = (version_tag, switch_only)
+
+        self._prepare_worker = PrepareUpdateWorker(self.__git_updater)
+        self._prepare_worker.finished.connect(self._on_update_prepared)
+        self._prepare_worker.error.connect(self._on_update_prepare_error)
+
+        self._prepare_worker.start()
+        # Запускаем цикл обработки событий, чтобы диалог мог обновляться
+        QApplication.processEvents()
 
     def _start_background_version_check(self) -> None:
         self.version_worker = VersionCheckWorker(self.__git_updater)

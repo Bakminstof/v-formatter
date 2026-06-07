@@ -62,11 +62,19 @@ class VersionWidget(QWidget):
         latest = self._model.latest
         all_versions = self._model.all
 
-        is_up_to_date = current == latest
-        emoji = "✅" if is_up_to_date else "⬆️"
-        self.version_label.setText(f"{self.label} {current} {emoji}")
+        if current == latest:
+            status = "✅"
+            update_btn_visible = False
+        elif latest == "unknown":
+            status = "⦿"
+            update_btn_visible = False
+        else:
+            status = "⬆️"
+            update_btn_visible = True
 
-        self.update_btn.setVisible(not is_up_to_date)
+        self.version_label.setText(f"{self.label} {current} {status}")
+
+        self.update_btn.setVisible(update_btn_visible)
 
         self.version_combo.blockSignals(True)
         self.version_combo.clear()
