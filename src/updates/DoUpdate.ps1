@@ -5,12 +5,13 @@
     Waits for the main application to exit, fetches the latest tags, checks out the specified tag,
     cleans the working directory, pulls Git LFS files if available, and restarts the application.
     All log messages are written to both the console and a file in the repository's logs folder.
+    The script stops immediately on the first error.
 .PARAMETER RepoPath
     Path to the local Git repository.
 .PARAMETER GitBin
     Path to the Git executable. Default is 'git'.
 .PARAMETER GitLfsBin
-    Path to the Git LFS executable (optional). If not provided, the script will try to detect it.
+    Path to the Git LFS executable (optional).
 .PARAMETER TargetTag
     Target tag to checkout (e.g., v1.2.3).
 .PARAMETER MainScript
@@ -24,14 +25,9 @@
 .EXAMPLE
     updater.ps1 -RepoPath "C:\MyApp" -TargetTag "v1.3.0" -MainScript "C:\MyApp\main.py" -Python "python" -Timeout 5 -- --debug
 #>
-
 param(
     [Parameter(Mandatory = $true)]
     [string]$RepoPath,
-
-    [string]$GitBin = "git",
-
-    [string]$GitLfsBin,
 
     [Parameter(Mandatory = $true)]
     [string]$TargetTag,
@@ -42,33 +38,34 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$Python,
 
+    [string]$GitBin = "git",
+
+    [string]$GitLfsBin,
+
     [int]$Timeout = 5,
 
-    # The remaining arguments are captured in $args.
-    # We'll extract the ones after '--' as OriginalArgs.
     [Parameter(ValueFromRemainingArguments = $true)]
     [object[]]$RemainingArguments
 )
+# Stop script on any error
+$ErrorActionPreference = "Stop"
 
-# Prepare log file in the repository's logs folder
+# ---------- Logging setup ----------
 $LogDir = Join-Path $RepoPath "logs"
 if (-not (Test-Path $LogDir)) {
     New-Item -ItemType Directory -Path $LogDir -Force | Out-Null
 }
 $LogFile = Join-Path $LogDir ("updater_" + (Get-Date -Format "yyyyMMdd_HHmmss") + ".log")
 
-# Function to write log messages to both console and file
 function Write-Log {
     param([string]$Message)
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     $fullMessage = "[$timestamp] $Message"
-    # Console output
     Write-Host $fullMessage
-    # File output
-    Add-Content -Path $LogFile -Value $fullMessage
+    $fullMessage | Out-File -FilePath $LogFile -Append -Encoding utf8
 }
 
-# Function to run a command and check for errors
+# ---------- Safe command runner ----------
 function Invoke-CommandSafe {
     param(
         [string[]]$Command,
@@ -76,28 +73,26 @@ function Invoke-CommandSafe {
     )
     $cmdString = $Command -join " "
     Write-Log "Executing: $cmdString"
+
+    $prevCwd = Get-Location
     try {
         if ($WorkingDirectory) {
-            Push-Location $WorkingDirectory
+            Set-Location $WorkingDirectory
         }
-        $process = Start-Process -FilePath $Command[0] -ArgumentList $Command[1..($Command.Length-1)] -NoNewWindow -Wait -PassThru
-        if ($process.ExitCode -ne 0) {
-            Write-Log "ERROR: Command returned exit code $($process.ExitCode)"
-            throw "Command failed with exit code $($process.ExitCode)"
+        $proc = Start-Process -FilePath $Command[0] -ArgumentList $Command[1..($Command.Length-1)] `
+                              -NoNewWindow -Wait -PassThru
+        if ($proc.ExitCode -ne 0) {
+            throw "Command failed with exit code $($proc.ExitCode)"
         }
-    }
-    catch {
-        Write-Log "ERROR: $_"
-        throw
     }
     finally {
         if ($WorkingDirectory) {
-            Pop-Location
+            Set-Location $prevCwd
         }
     }
 }
 
-# Main script starts here
+# ---------- Main script ----------
 Write-Log "Updater started."
 Write-Log "Log file: $LogFile"
 
@@ -107,78 +102,56 @@ Start-Sleep -Seconds $Timeout
 
 # 2. Validate repository path
 if (-not (Test-Path -Path $RepoPath -PathType Container)) {
-    Write-Log "ERROR: Repository path '$RepoPath' does not exist."
-    exit 1
+    throw "Repository path '$RepoPath' does not exist."
 }
 if (-not (Test-Path -Path (Join-Path $RepoPath ".git") -PathType Container)) {
-    Write-Log "ERROR: '$RepoPath' is not a Git repository (missing .git directory)."
-    exit 1
+    throw "'$RepoPath' is not a Git repository (missing .git directory)."
 }
 
-# 3. Ensure Git is available
-$gitPath = (Get-Command $GitBin -ErrorAction SilentlyContinue).Source
-if (-not $gitPath -and -not (Test-Path $GitBin)) {
-    Write-Log "ERROR: Git executable '$GitBin' not found."
-    exit 1
+# 3. Resolve Git executable
+$resolvedGit = Get-Command $GitBin -ErrorAction SilentlyContinue
+if ($resolvedGit) {
+    $GitBin = $resolvedGit.Source
 }
-$GitBin = $gitPath ?? $GitBin
+elseif (-not (Test-Path $GitBin)) {
+    throw "Git executable not found: '$GitBin'"
+}
+Write-Log "Using Git: $GitBin"
 
 # 4. Fetch all tags from origin
-try {
-    Invoke-CommandSafe -Command @($GitBin, "fetch", "--tags") -WorkingDirectory $RepoPath
-}
-catch {
-    Write-Log "ERROR: Failed to fetch tags."
-    exit 1
-}
+Invoke-CommandSafe -Command @($GitBin, "fetch", "--tags") -WorkingDirectory $RepoPath
 
 # 5. Checkout the target tag (force, clean, reset)
-try {
-    Invoke-CommandSafe -Command @($GitBin, "checkout", "-f", "tags/$TargetTag") -WorkingDirectory $RepoPath
-    Invoke-CommandSafe -Command @($GitBin, "clean", "-fd") -WorkingDirectory $RepoPath
-    Invoke-CommandSafe -Command @($GitBin, "reset", "--hard") -WorkingDirectory $RepoPath
-}
-catch {
-    Write-Log "ERROR: Failed to checkout tag '$TargetTag'."
-    exit 1
-}
+Invoke-CommandSafe -Command @($GitBin, "checkout", "-f", "tags/$TargetTag") -WorkingDirectory $RepoPath
+Invoke-CommandSafe -Command @($GitBin, "clean", "-fd") -WorkingDirectory $RepoPath
+Invoke-CommandSafe -Command @($GitBin, "reset", "--hard") -WorkingDirectory $RepoPath
 
-# 6. Handle Git LFS (if available)
-# Check if Git LFS is installed by trying to run 'git lfs version'
+# 6. Handle Git LFS (Исправленная логика)
 $lfsAvailable = $false
 try {
     $lfsCheck = Start-Process -FilePath $GitBin -ArgumentList "lfs","version" -NoNewWindow -Wait -PassThru
     $lfsAvailable = ($lfsCheck.ExitCode -eq 0)
-}
-catch {
-    $lfsAvailable = $false
-}
+} catch { }
 
 if ($lfsAvailable) {
     Write-Log "Git LFS detected, pulling LFS objects..."
-    $lfsExecutable = if ($GitLfsBin) { $GitLfsBin } else { "git-lfs" }
-    try {
-        Invoke-CommandSafe -Command @($GitBin, "lfs", "pull") -WorkingDirectory $RepoPath
-        Invoke-CommandSafe -Command @($GitBin, "lfs", "prune", "--force") -WorkingDirectory $RepoPath
-    }
-    catch {
-        Write-Log "WARNING: Git LFS pull/prune failed (possibly LFS is not fully configured)."
-    }
-}
-else {
+    Invoke-CommandSafe -Command @($GitBin, "lfs", "pull") -WorkingDirectory $RepoPath
+    Invoke-CommandSafe -Command @($GitBin, "lfs", "prune", "--force") -WorkingDirectory $RepoPath
+} elseif (-not [string]::IsNullOrEmpty($GitLfsBin) -and (Test-Path $GitLfsBin)) {
+    Write-Log "Using explicit Git LFS binary, pulling LFS objects..."
+    Invoke-CommandSafe -Command @($GitLfsBin, "pull") -WorkingDirectory $RepoPath
+    Invoke-CommandSafe -Command @($GitLfsBin, "prune", "--force") -WorkingDirectory $RepoPath
+} else {
     Write-Log "Git LFS not available, skipping LFS operations."
 }
 
 # 7. Extract original arguments for the main application
 $originalArgs = @()
 if ($RemainingArguments -and $RemainingArguments.Count -gt 0) {
-    # Find the first occurrence of '--' separator and take everything after it
     $separatorIndex = [Array]::IndexOf($RemainingArguments, '--')
     if ($separatorIndex -ge 0) {
         $originalArgs = $RemainingArguments[($separatorIndex + 1)..($RemainingArguments.Count - 1)]
-    }
-    else {
-        # No separator, assume all remaining args are for the app
+    } else {
         $originalArgs = $RemainingArguments
     }
 }

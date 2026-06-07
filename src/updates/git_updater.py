@@ -173,7 +173,7 @@ class GitUpdater:
         git_bin = self.tools_tmp_dir / self.portable_git_base_dir.name / "bin" / "git.exe"
         git_lfs_bin = self.tools_tmp_dir / self.portable_git_base_dir.name / "bin" / "git-lfs.exe"
 
-        Popen(
+        p = Popen(
             [
                 "powershell",
                 "-executionpolicy",
@@ -193,8 +193,31 @@ class GitUpdater:
                 "-MainScript",
                 sys.argv[0],
             ],
+            shell=True,
             creationflags=creationflags,
             close_fds=True,
         )
-
+        print(
+            " ".join(
+                [
+                    "powershell",
+                    "-executionpolicy",
+                    "bypass",
+                    "-file",
+                    update_entrypoint_file.as_posix(),
+                    "-RepoPath",
+                    self.repo_path.as_posix(),
+                    "-GitBin",
+                    git_bin.as_posix(),
+                    "-GitLfsBin",
+                    git_lfs_bin.as_posix(),
+                    "-TargetTag",
+                    target_tag,
+                    "-Python",
+                    sys.executable,
+                    "-MainScript",
+                    sys.argv[0],
+                ]
+            )
+        )
         exit(0)
