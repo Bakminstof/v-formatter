@@ -55,7 +55,7 @@ $LogDir = Join-Path $RepoPath "logs"
 if (-not (Test-Path $LogDir)) {
     New-Item -ItemType Directory -Path $LogDir -Force | Out-Null
 }
-$LogFile = Join-Path $LogDir ("updater_" + (Get-Date -Format "yyyyMMdd_HHmmss") + ".log")
+$LogFile = Join-Path $LogDir "updates.log"
 
 function Write-Log {
     param([string]$Message)
