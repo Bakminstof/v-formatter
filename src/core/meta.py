@@ -1,13 +1,14 @@
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
-from pathlib import Path
 from json import loads
+from pathlib import Path
 from typing import Iterable
-from concurrent.futures import ThreadPoolExecutor, as_completed, Future
+
+from loguru import logger
 
 from core.database import VideoRegistry
 from core.models import VideoMetaModel
 from core.process import ManagedProcess
-from loguru import logger
 
 
 class VideoMetaProcessor:

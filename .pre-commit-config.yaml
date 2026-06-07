@@ -5,11 +5,11 @@ repos:
     rev: v6.0.0
     hooks:
       - id: trailing-whitespace
-        exclude: ^interpreters/
+        exclude: ^interpreters/|tools/
       - id: end-of-file-fixer
-        exclude: ^interpreters/
+        exclude: ^interpreters/|tools/
       - id: check-yaml
-        exclude: ^interpreters/
+        exclude: ^interpreters/|tools/
       - id: check-added-large-files
         args: ['--maxkb=40960']
 
@@ -17,12 +17,12 @@ repos:
     rev: 25.12.0
     hooks:
       - id: black
-        exclude: ^interpreters/
+        exclude: ^interpreters/|tools/
         args: [ "-l", "100" ]
 
   - repo: https://github.com/PyCQA/isort
     rev: 7.0.0
     hooks:
       - id: isort
-        exclude: ^interpreters/
+        exclude: ^interpreters/|tools/
         args: [ "--profile", "black" ]

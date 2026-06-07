@@ -8,15 +8,14 @@ if ROOT_DIR_PATH_STR not in path:
     path.append(ROOT_DIR_PATH_STR)
 
 from loguru import logger
-
 from PySide6.QtWidgets import QApplication
 
-from core.utils import startup, parse_args
-from ui.main_window import MainWindow
 from core.concatenator import VideoConcatenator
 from core.database import VideoRegistry
 from core.meta import VideoMetaProcessor
 from core.settings import settings
+from core.utils import parse_args, startup
+from ui.main_window import MainWindow
 
 
 def main() -> None:

@@ -1,10 +1,11 @@
 from argparse import ArgumentParser
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
+
 import humanize
 
-from core.models import ArgsModel
 from core.logs import setup_logging
+from core.models import ArgsModel
 from ui.i18n import get_windows_ui_language
 from ui.models import Lang
 

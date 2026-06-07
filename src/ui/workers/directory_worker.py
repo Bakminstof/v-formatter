@@ -1,11 +1,11 @@
 from pathlib import Path
 
-from core.concatenator import VideoConcatenator, VideosStructureModel
-from core.database import VideoRegistry
-from core.meta import VideoMetaProcessor
 from loguru import logger
 from PySide6.QtCore import QThread, Signal
 
+from core.concatenator import VideoConcatenator, VideosStructureModel
+from core.database import VideoRegistry
+from core.meta import VideoMetaProcessor
 from core.process import ManagedProcess
 
 
@@ -66,9 +66,7 @@ class Worker(QThread):
         self._process = ManagedProcess("EMPTY", [])
 
         try:
-            self.meta_processor.update_meta_bulk(
-                self.structure.data[self.input_dir].files.values()
-            )
+            self.meta_processor.update_meta_bulk(self.structure.data[self.input_dir].files.values())
 
             target_files = self._get_target_files()
 

@@ -93,9 +93,7 @@ class ManagedProcess:
         self._killed = False
 
     def run(self) -> ProcessResultModel:
-        logger.info(
-            "[{}] Command: {}", self.title, " ".join([str(i) for i in self.command])
-        )
+        logger.info("[{}] Command: {}", self.title, " ".join([str(i) for i in self.command]))
 
         self._process = Popen(
             self.command,

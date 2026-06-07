@@ -31,9 +31,7 @@ class DirSelectorWidget(QWidget):
         self.setLayout(row)
 
     def select_dir(self) -> None:
-        path = QFileDialog.getExistingDirectory(
-            self, "Select folder", self.edit.text() or ""
-        )
+        path = QFileDialog.getExistingDirectory(self, "Select folder", self.edit.text() or "")
         if path:
             self.set_path(path)
 

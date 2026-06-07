@@ -3,9 +3,6 @@ from pathlib import Path
 from typing import Iterator
 
 import humanize
-from core.database import VideoRegistry
-from core.meta import VideoMetaProcessor
-from core.models import AppInfoModel
 from loguru import logger
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
@@ -20,8 +17,11 @@ from PySide6.QtWidgets import (
 )
 
 from core.concatenator import VideoConcatenator, VideosStructureModel
+from core.database import VideoRegistry
+from core.meta import VideoMetaProcessor
+from core.models import AppInfoModel
 from ui.i18n import I18n, get_windows_ui_language
-from ui.models import LocalMetaModel, Status, Lang
+from ui.models import Lang, LocalMetaModel, Status
 from ui.settings import load_local_meta, save_local_meta
 from ui.widgets.dir_selector import DirSelectorWidget
 from ui.widgets.elapsed_time import ElapsedTimeWidget
@@ -281,9 +281,7 @@ class MainWindow(QMainWindow):
         self.elapsed_time_widget.stop()
 
     def _update_progress(self) -> None:
-        percent = int(
-            (self.current_task_index / self.total_tasks) * 100 if self.total_tasks else 0
-        )
+        percent = int((self.current_task_index / self.total_tasks) * 100 if self.total_tasks else 0)
         self.progress_bar.setValue(percent)
 
     def _on_task_finished(self, success: bool) -> None:

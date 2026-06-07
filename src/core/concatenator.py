@@ -2,9 +2,9 @@ from pathlib import Path
 from re import compile as re_compile
 
 from loguru import logger
+from pydantic import BaseModel
 
 from core.process import ManagedProcess
-from pydantic import BaseModel
 
 type SourcePath = Path
 type Index = int

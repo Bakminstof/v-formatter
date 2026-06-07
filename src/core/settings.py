@@ -1,13 +1,13 @@
-from sys import path
-from pathlib import Path
 from functools import cached_property
+from pathlib import Path
+from sys import path
 from tempfile import gettempdir
+
+from pydantic import BaseModel, ConfigDict, computed_field, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from core import version
 from core.models import AppInfoModel
-from pydantic import BaseModel, ConfigDict, field_validator, computed_field
-from pydantic_settings import BaseSettings, SettingsConfigDict
-
 from ui.models import Lang
 
 APP_NAME = "VFormatter"
@@ -33,9 +33,7 @@ class LoggingSettings(BaseModel):
     retention: str = "30 days"
     compression: str = "gz"
 
-    console_format: str = (
-        "<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | {message}"
-    )
+    console_format: str = "<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | {message}"
 
     file_path: Path = LOGS_DIR / "contact.log"
 
@@ -89,9 +87,9 @@ class UpdatesSettings(BaseModel):
 
     tools_tmp_dir: Path = TMP_DIR / "tools"
 
+
 class ToolsSettings(BaseModel):
     portable_git_base_dir: Path = TOOLS_DIR / "PortableGit"
-
 
 
 class Settings(BaseSettings):

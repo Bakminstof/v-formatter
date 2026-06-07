@@ -14,9 +14,7 @@ class ElapsedTimeWidget(QWidget):
         self._time_label = QLabel("00:00")
 
         self._time_label.setMinimumWidth(60)
-        self._time_label.setAlignment(
-            self._time_label.alignment() | self._time_label.alignment()
-        )
+        self._time_label.setAlignment(self._time_label.alignment() | self._time_label.alignment())
 
         self._timer = QTimer(self)
         self._timer.setInterval(1000)

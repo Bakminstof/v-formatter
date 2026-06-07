@@ -1,12 +1,12 @@
 from pathlib import Path
+from sqlite3 import Connection, Row, connect
+from threading import local as threading_local
 from typing import Generator
 
-from core.utils import local_to_utc_time
 from loguru import logger
-from threading import local as threading_local
-from sqlite3 import connect, Connection, Row
 
 from core.models import VideoMetaModel
+from core.utils import local_to_utc_time
 
 
 class VideoRegistry:

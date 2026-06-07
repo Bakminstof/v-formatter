@@ -1,9 +1,9 @@
 import sys
 import time
 from pathlib import Path
-from shutil import copytree, copy2
-from sys import platform
+from shutil import copy2, copytree
 from subprocess import CREATE_NEW_PROCESS_GROUP, Popen
+from sys import platform
 
 import git
 import requests
@@ -89,8 +89,7 @@ class GitUpdater:
 
         if not self._is_valid_semver_tag(current):
             logger.info(
-                "Текущая версия '{}' не является релизным тегом, "
-                "предлагаем обновление до '{}'",
+                "Текущая версия '{}' не является релизным тегом, " "предлагаем обновление до '{}'",
                 current,
                 latest_tag,
             )
@@ -172,9 +171,7 @@ class GitUpdater:
             creationflags = 0
 
         git_bin = self.tools_tmp_dir / self.portable_git_base_dir.name / "bin" / "git.exe"
-        git_lfs_bin = (
-            self.tools_tmp_dir / self.portable_git_base_dir.name / "bin" / "git-lfs.exe"
-        )
+        git_lfs_bin = self.tools_tmp_dir / self.portable_git_base_dir.name / "bin" / "git-lfs.exe"
 
         Popen(
             [

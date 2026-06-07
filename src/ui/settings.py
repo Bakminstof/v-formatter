@@ -40,9 +40,7 @@ def save_local_meta(
 ) -> None:
     if not file_path.parent.exists():
         file_path.parent.mkdir(parents=True, exist_ok=True)
-        logger.debug(
-            "Created local dir: {}".format(file_path.parent.absolute().as_posix())
-        )
+        logger.debug("Created local dir: {}".format(file_path.parent.absolute().as_posix()))
 
     try:
         with file_path.open("w", encoding=encoding) as f:
