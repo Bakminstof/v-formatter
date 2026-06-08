@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from core.models import VersionsInfoModel
+from core.models import UNKNOWN_VERSION, VersionsInfoModel
 
 
 class VersionWidget(QWidget):
@@ -65,7 +65,7 @@ class VersionWidget(QWidget):
         if current == latest:
             status = "✅"
             update_btn_visible = False
-        elif latest == "unknown":
+        elif latest == UNKNOWN_VERSION:
             status = "⦿"
             update_btn_visible = False
         else:
