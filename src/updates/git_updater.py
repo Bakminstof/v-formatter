@@ -1,7 +1,7 @@
 import sys
 import time
 from pathlib import Path
-from shutil import copy2, copytree
+from shutil import copy2
 from subprocess import CREATE_NEW_PROCESS_GROUP, Popen
 from sys import platform
 
@@ -12,6 +12,7 @@ from loguru import logger
 from packaging.version import InvalidVersion, Version
 
 from core.models import UNKNOWN_VERSION, VersionsInfoModel
+from core.process import ManagedProcess
 
 
 class GitUpdater:
@@ -128,7 +129,16 @@ class GitUpdater:
 
         start = time.monotonic()
 
-        copytree(self.portable_git_base_dir, self.tools_tmp_dir, dirs_exist_ok=True)
+        ManagedProcess(
+            "Delivery Tools",
+            [
+                "robocopy",
+                "/mir",
+                self.portable_git_base_dir,
+                self.tools_tmp_dir / self.portable_git_base_dir.name,
+            ],
+            shell=True,
+        ).run()
 
         update_entrypoint_file_name = "DoUpdate.ps1"
         update_entrypoint_file = self.updater_tmp_dir / update_entrypoint_file_name
