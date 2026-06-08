@@ -121,8 +121,8 @@ class GitUpdater:
             return None, None
 
     def _update(self) -> None:
-        self.repo.remote("origin").fetch(tags=True)
-        self.repo.git.lfs("pull")
+        self.repo.remote("origin").fetch(tags=True, prune=True, prune_tags=True)
+        self.repo.git.lfs("fetch")
 
     def prepare_update(self) -> Path:
         logger.debug("[{}] Prepare updates start", self)
