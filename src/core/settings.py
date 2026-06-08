@@ -5,7 +5,6 @@ from tempfile import gettempdir
 from pydantic import BaseModel, ConfigDict, computed_field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from core import version
 from core.models import AppInfoModel
 from ui.models import Lang
 
@@ -105,10 +104,7 @@ class Settings(BaseSettings):
     @computed_field
     @cached_property
     def app_info(self) -> AppInfoModel:
-        return AppInfoModel(
-            name=APP_NAME,
-            version=version,
-        )
+        return AppInfoModel(name=APP_NAME)
 
     default_encoding: str = DEFAULT_ENCODING
 

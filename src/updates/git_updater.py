@@ -11,8 +11,7 @@ import requests
 from loguru import logger
 from packaging.version import InvalidVersion, Version
 
-from core import version
-from core.models import VersionsInfoModel
+from core.models import UNKNOWN_VERSION, VersionsInfoModel
 
 
 class GitUpdater:
@@ -60,12 +59,12 @@ class GitUpdater:
             all_versions = self.get_all_version_tags()
             latest_version, _ = self._get_latest_release()
         else:
-            current_version = version
-            all_versions = [version]
+            current_version = UNKNOWN_VERSION
+            all_versions = [current_version]
 
         self._versions_data = VersionsInfoModel(
             current=current_version,
-            latest=latest_version or "unknown",
+            latest=latest_version or UNKNOWN_VERSION,
             all=all_versions,
         )
 
@@ -96,7 +95,7 @@ class GitUpdater:
 
     def get_current_version(self) -> str:
         if not self.is_git_repo():
-            return version
+            return UNKNOWN_VERSION
 
         try:
             return self.repo.git.describe("--tags", "--exact-match")
@@ -104,7 +103,7 @@ class GitUpdater:
             try:
                 return self.repo.head.commit.hexsha[:7]
             except Exception:
-                return version
+                return UNKNOWN_VERSION
 
     def _get_latest_release(self) -> tuple[str | None, str | None]:
         url = (

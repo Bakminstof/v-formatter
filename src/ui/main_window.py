@@ -84,7 +84,7 @@ class MainWindow(QMainWindow):
             locales_dir,
         )
 
-        self.setWindowTitle(f"{self._app_info.name} ({self._app_info.version})")
+        self.setWindowTitle(self._app_info.name)
 
         # load settings
         self.local_meta_file_path = local_meta_file_path
@@ -416,6 +416,9 @@ class MainWindow(QMainWindow):
         self._process_next()
 
     def _process_next(self) -> None:
+        if hasattr(self, "worker"):
+            self.worker.stop()
+
         self.worker = None
 
         if self.current_task_index >= self.total_tasks:

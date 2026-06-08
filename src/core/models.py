@@ -10,7 +10,6 @@ class ArgsModel(BaseModel):
 
 class AppInfoModel(BaseModel):
     name: str
-    version: str
 
 
 class VideoMetaModel(BaseModel):
@@ -22,6 +21,9 @@ class VideoMetaModel(BaseModel):
     duration: float
     error: str | None = None
     processed_at: datetime = datetime.now()
+
+
+UNKNOWN_VERSION = "unknown"
 
 
 class VersionsInfoModel(BaseModel):
