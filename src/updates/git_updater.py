@@ -128,13 +128,19 @@ class GitUpdater:
 
     def fetch(self) -> bool:
         try:
-            self.repo.remote("origin").fetch(tags=True, prune=True, prune_tags=True)
-            self.repo.git.lfs("fetch")
-            self.repo.git.lfs("prune")
+            self.repo.remote("origin").fetch(
+                tags=True, prune=True, prune_tags=True, progress=self._git_progress
+            )
+            self.repo.git.lfs("fetch", progress=self._git_progress)
+            self.repo.git.lfs("prune", progress=self._git_progress)
             return True
         except Exception as e:
             logger.error("[{}] Fetch updates failed: {}", self, str(e))
             return False
+
+    def _git_progress(self, op_code, cur_count, max_count, message: str | None) -> None:
+        if message:
+            logger.info("[{}] {}", self, message.strip())
 
     def prepare_update(self) -> Path:
         update_entrypoint_file_name = "DoUpdate.ps1"
