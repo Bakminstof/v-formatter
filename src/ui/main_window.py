@@ -24,6 +24,7 @@ from core.concatenator import VideoConcatenator, VideosStructureModel
 from core.database import VideoRegistry
 from core.meta import VideoMetaProcessor
 from core.models import AppInfoModel, VersionsInfoModel
+from core.tasks import TaskManager
 from ui.i18n import I18n, get_windows_ui_language
 from ui.models import Lang, LocalMetaModel, Status
 from ui.settings import load_local_meta, save_local_meta
@@ -33,13 +34,15 @@ from ui.widgets.format_selector import FormatSelectorWidget
 from ui.widgets.log_widget import LogWidget, QtLogHandler
 from ui.widgets.time_interval import TimeIntervalWidget
 from ui.widgets.version_widget import VersionWidget
-from ui.workers.directory_worker import Worker
-from ui.workers.prepare_update_worker import PrepareUpdateWorker
-from ui.workers.version_worker import VersionCheckWorker
 from updates.git_updater import GitUpdater
+from workers.directory_worker import Worker
+from workers.prepare_update_worker import PrepareUpdateWorker
+from workers.version_worker import VersionCheckWorker
 
 
 class MainWindow(QMainWindow):
+    __concat_started: bool = False
+
     def __init__(
         self,
         icon_path: Path,
@@ -56,11 +59,13 @@ class MainWindow(QMainWindow):
         registry: VideoRegistry,
     ) -> None:
         super().__init__()
+
         self._app_info = app_info
 
         self.__temp_dir = temp_dir
         self.__encoding = encoding
 
+        # Utils
         self.__git_updater = git_updater
         self.video_concatenator = video_concatenator
         self.meta_processor = meta_processor
@@ -75,7 +80,7 @@ class MainWindow(QMainWindow):
         self.total_tasks: int = 0
         self.current_task_index: int = 0
         self.current_task_iter: Iterator[Path] | None = None
-        self.start_time: float = 0.0
+        self.start_time: float | int = 0.0
 
         # i18n
         self.i18n = I18n(
@@ -93,20 +98,21 @@ class MainWindow(QMainWindow):
             encoding=self.__encoding,
         )
 
+        # Tasks
+        self.tasks = TaskManager()
+
         # Workers
         self.worker: Worker
         self.version_worker: VersionCheckWorker
-
         self._prepare_worker: PrepareUpdateWorker
-
-        self.format_widget: FormatSelectorWidget
-        self.elapsed_time_widget: ElapsedTimeWidget
-        self.time_filter_widget: TimeIntervalWidget
 
         # --- Initialize UI ---
         self.input_dir_widget: DirSelectorWidget
         self.output_dir_widget: DirSelectorWidget
         self.version_widget: VersionWidget
+        self.format_widget: FormatSelectorWidget
+        self.elapsed_time_widget: ElapsedTimeWidget
+        self.time_filter_widget: TimeIntervalWidget
 
         self._init_window()
 
@@ -122,6 +128,11 @@ class MainWindow(QMainWindow):
         self._init_time_filter_widget()
         self._init_version_widget()
         self._init_layout()
+
+    def __on_startup(self) -> None:
+        self.tasks.add_task(
+            callback=self.__git_updater.prepare_update,
+        )
 
     # ---------- UI Initialization ----------
     def _init_window(self) -> None:
@@ -370,6 +381,16 @@ class MainWindow(QMainWindow):
         self._start_background_version_check()
 
     def start(self) -> None:
+        if self.__concat_started:
+            logger.warning("Concat is already started.")
+            return
+
+        self.__concat_started = True
+
+        if self.local_meta.input_dir is None or self.local_meta.output_dir is None:
+            logger.error("Input or output dir not set")
+            return
+
         self._save_current_meta()
 
         self.videos_structure = self.video_concatenator.collect_data_dirs(
@@ -397,10 +418,14 @@ class MainWindow(QMainWindow):
         self._process_next()
 
     def stop(self) -> None:
-        if hasattr(self, "worker"):
+        if getattr(self, "worker", None) is not None:
             self.worker.stop()
 
         self.elapsed_time_widget.stop()
+        self.__concat_started = False
+
+    def shutdown(self) -> None:
+        self.tasks.stop_all()
 
     def _update_progress(self) -> None:
         percent = int((self.current_task_index / self.total_tasks) * 100 if self.total_tasks else 0)
@@ -416,7 +441,7 @@ class MainWindow(QMainWindow):
         self._process_next()
 
     def _process_next(self) -> None:
-        if hasattr(self, "worker"):
+        if getattr(self, "worker", None) is not None:
             self.worker.stop()
 
         self.worker = None
@@ -429,6 +454,9 @@ class MainWindow(QMainWindow):
             logger.success("Обработка завершена за {}", text)
             self.progress_bar.setValue(100)
             self._save_current_meta()
+
+            self.__concat_started = False
+
             return
 
         index = self.current_task_index

@@ -81,6 +81,8 @@ class UISettings(BaseModel):
 
 
 class UpdatesSettings(BaseModel):
+    fetch_interval_s: int = 600
+
     updater_tmp_dir: Path = TMP_DIR / "updates"
 
     tools_tmp_dir: Path = TMP_DIR / "tools"

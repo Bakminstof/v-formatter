@@ -84,7 +84,12 @@ class Worker(QThread):
             self._process = None
 
         except Exception as e:
-            logger.error("[{}] Exception: {}", self.input_dir.name, str(e))
+            logger.exception(
+                "[Dir:{}] Exception: {}",
+                self.input_dir.name,
+                str(e),
+                exc_info=e,
+            )
             self.finished.emit(False)
 
     def stop(self) -> None:

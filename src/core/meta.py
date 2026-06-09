@@ -70,7 +70,7 @@ class VideoMetaProcessor:
         elapsed = time.monotonic() - start
 
         logger.info(
-            "[{}] Finish indexing at {:.2f}",
+            "[{}] Finish indexing at {}",
             self,
             humanize.precisedelta(elapsed),
         )

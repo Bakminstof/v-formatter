@@ -16,6 +16,8 @@ from core.process import ManagedProcess
 
 
 class GitUpdater:
+    _prepared: bool = False
+
     def __init__(
         self,
         repo_path: Path,
@@ -120,11 +122,23 @@ class GitUpdater:
             logger.error("Ошибка при запросе последнего релиза: {}", e)
             return None, None
 
-    def _update(self) -> None:
-        self.repo.remote("origin").fetch(tags=True, prune=True, prune_tags=True)
-        self.repo.git.lfs("fetch")
+    def fetch(self) -> bool:
+        try:
+            self.repo.remote("origin").fetch(tags=True, prune=True, prune_tags=True)
+            self.repo.git.lfs("fetch")
+            self.repo.git.lfs("prune")
+            return True
+        except Exception as e:
+            logger.error("[{}] Fetch updates failed: {}", self, str(e))
+            return False
 
     def prepare_update(self) -> Path:
+        update_entrypoint_file_name = "DoUpdate.ps1"
+        update_entrypoint_file = self.updater_tmp_dir / update_entrypoint_file_name
+
+        if self._prepared:
+            return update_entrypoint_file
+
         logger.debug("[{}] Prepare updates start", self)
 
         start = time.monotonic()
@@ -138,10 +152,9 @@ class GitUpdater:
                 self.tools_tmp_dir / self.portable_git_base_dir.name,
             ],
             shell=True,
+            output_log_level="DEBUG",
         ).run()
 
-        update_entrypoint_file_name = "DoUpdate.ps1"
-        update_entrypoint_file = self.updater_tmp_dir / update_entrypoint_file_name
         self.updater_tmp_dir.mkdir(exist_ok=True, parents=True)
 
         copy2(
@@ -158,7 +171,9 @@ class GitUpdater:
             humanize.precisedelta(elapsed),
         )
 
-        self._update()
+        self.fetch()
+
+        self._prepared = True
 
         return update_entrypoint_file
 

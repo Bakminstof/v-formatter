@@ -31,13 +31,14 @@ def emit_log(
     line: str,
     *,
     is_error: bool,
+    output_log_level: str = "INFO",
 ) -> None:
     prefix = f"[{title}] {line}"
 
     if is_error:
         logger.error("{}", prefix)
     else:
-        logger.info("{}", prefix)
+        logger.log(output_log_level, "{}", prefix)
 
 
 def consume_remaining_output(
@@ -47,6 +48,7 @@ def consume_remaining_output(
     *,
     capture_output: bool = False,
     error_flags: Iterable[str] | None = None,
+    output_log_level: str = "INFO",
 ) -> None:
     if not process.stdout:
         return
@@ -57,7 +59,7 @@ def consume_remaining_output(
             continue
 
         is_error = is_error_line(line, error_flags)
-        emit_log(title, line, is_error=is_error)
+        emit_log(title, line, is_error=is_error, output_log_level=output_log_level)
 
         if is_error:
             result.error_lines.append(line)
@@ -78,6 +80,7 @@ class ManagedProcess:
         error_flags: Iterable[str] | None = None,
         shell: bool = False,
         capture_output: bool = False,
+        output_log_level: str = "INFO",
     ) -> None:
         self.title = title
         self.command = command
@@ -87,13 +90,19 @@ class ManagedProcess:
         self.error_flags = error_flags
         self.shell = shell
         self.capture_output = capture_output
+        self.output_log_level = output_log_level
 
         self._lock = Lock()
         self._process: Popen | None = None
         self._killed = False
 
     def run(self) -> ProcessResultModel:
-        logger.info("[{}] Command: {}", self.title, " ".join([str(i) for i in self.command]))
+        logger.log(
+            self.output_log_level,
+            "[{}] Command: {}",
+            self.title,
+            " ".join([str(i) for i in self.command]),
+        )
 
         self._process = Popen(
             self.command,
@@ -133,7 +142,12 @@ class ManagedProcess:
                 stdout.append(line)
 
             is_error = is_error_line(line, self.error_flags)
-            emit_log(self.title, line, is_error=is_error)
+            emit_log(
+                self.title,
+                line,
+                is_error=is_error,
+                output_log_level=self.output_log_level,
+            )
 
             if is_error:
                 error_lines.append(line)
@@ -150,6 +164,7 @@ class ManagedProcess:
             result,
             error_flags=self.error_flags,
             capture_output=self.capture_output,
+            output_log_level=self.output_log_level,
         )
         return result
 
