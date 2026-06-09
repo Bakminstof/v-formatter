@@ -9,7 +9,6 @@ from sys import platform
 import git
 import humanize
 import requests
-from git import RemoteProgress
 from loguru import logger
 from packaging.version import InvalidVersion, Version
 
@@ -131,15 +130,29 @@ class GitUpdater:
         try:
             logger.info("[{}] Fetching updates", self)
 
-            self.repo.remote("origin").fetch(
-                tags=True,
-                prune=True,
-                prune_tags=True,
-                progress=FetchProgress(),
-            )
-            self.run_lfs_with_progress()
+            ManagedProcess(
+                f"{self}|Fetch",
+                [
+                    self.repo.git.GIT_PYTHON_GIT_EXECUTABLE,
+                    "fetch",
+                    "--tags",
+                    "--prune",
+                    "--prune-tags",
+                    "--progress",
+                ],
+            ).run()
+
+            logger.info("[{}|LFS Fetch] Starting fetch", self)
+
+            ManagedProcess(
+                f"{self}|LFS Fetch",
+                [self.repo.git.GIT_PYTHON_GIT_EXECUTABLE, "lfs", "fetch"],
+            ).run()
+
+            logger.info("[{}|LFS Fetch] Done!", self)
 
             logger.success("[{}] Fetch updates done", self)
+
             return True
         except Exception as e:
             logger.error("[{}] Fetch updates failed: {}", self, str(e))
@@ -248,62 +261,3 @@ class GitUpdater:
                 origin.set_url(new_url)
 
                 logger.debug("[{}] origin url update to: {}", self, new_url)
-
-    def run_lfs_with_progress(self) -> None:
-        lfs_env = {"GIT_LFS_PROGRESS": "1"}
-
-        logger.info("[{}] Starting Git LFS Fetch", self)
-
-        proc = self.repo.git.execute(
-            ["git", "lfs", "fetch"],
-            as_process=True,
-            env=lfs_env,
-            universal_newlines=True,
-        )
-
-        for line in proc.stdout:
-            logger.info("[{}|LFS Fetch] {}", self, line.strip(), end="\r")
-
-        proc.wait()
-        logger.info("[{}|LFS Fetch] Done!", self)
-
-        logger.info("Starting Git LFS Prune")
-        proc_prune = self.repo.git.execute(
-            ["git", "lfs", "prune"],
-            as_process=True,
-            universal_newlines=True,
-        )
-
-        for line in proc_prune.stdout:
-            logger.info("[{}|LFS Prune] {}", self, line.strip(), end="\r")
-
-        proc_prune.wait()
-        logger.info("[{}|LFS Prune] Done!", self)
-
-
-class FetchProgress(RemoteProgress):
-    def update(
-        self,
-        op_code: int,
-        cur_count: str | float,
-        max_count: str | float | None = None,
-        message: str = "",
-    ) -> None:
-        total = max_count if max_count else "?"
-
-        op_name = self._get_op_name(op_code)
-
-        logger.info(f"[{op_name}] Progress: {cur_count}/{total} {message}", end="\r")
-
-    @staticmethod
-    def _get_op_name(op_code):
-        if op_code & RemoteProgress.COUNTING:
-            return "Counting objects"
-        if op_code & RemoteProgress.COMPRESSING:
-            return "Compressing objects"
-        if op_code & RemoteProgress.WRITING:
-            return "Writing objects"
-        if op_code & RemoteProgress.RECEIVING:
-            return "Receiving objects"
-
-        return "Processing"

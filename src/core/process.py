@@ -4,7 +4,7 @@ from pathlib import Path
 from subprocess import CREATE_NO_WINDOW, PIPE, STDOUT, Popen
 from sys import platform
 from threading import Lock
-from typing import Iterable
+from typing import Iterable, Mapping
 
 from loguru import logger
 from pydantic import BaseModel
@@ -40,6 +40,7 @@ class ManagedProcess:
         encoding: str = "utf-8",
         timeout: int | None = None,
         cwd: str | Path | None = None,
+        env: Mapping[str, str] | None = None,
         error_flags: Iterable[str] = DEFAULT_ERROR_FLAGS,
         shell: bool = False,
         capture_output: bool = False,
@@ -50,6 +51,7 @@ class ManagedProcess:
         self.command = command
         self.timeout = timeout
         self.cwd = cwd
+        self.env = env
         self.encoding = encoding
         self.error_flags = error_flags
         self.shell = shell
@@ -74,6 +76,7 @@ class ManagedProcess:
             stdout=PIPE,
             stderr=STDOUT,
             cwd=self.cwd,
+            env=self.env,
             text=True,
             encoding=self.encoding,
             errors="replace",
