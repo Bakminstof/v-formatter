@@ -81,7 +81,7 @@ class ManagedProcess:
             encoding=self.encoding,
             errors="replace",
             shell=self.shell,
-            bufsize=1,
+            bufsize=-1,
             creationflags=CREATE_NO_WINDOW if platform == "win32" else 0,
         )
 
@@ -92,10 +92,6 @@ class ManagedProcess:
         has_timeout = self.timeout is not None
 
         while True:
-            if self._killed:
-                self._kill()
-                break
-
             if has_timeout and datetime.now() > deadline:
                 logger.error("[{}] Timeout exceeded", self.title)
                 self._kill()
@@ -117,7 +113,8 @@ class ManagedProcess:
             line = line.strip()
             self._process_line(line, stdout, error_lines)
 
-        self._kill()
+        with suppress(Exception):
+            self._process.wait(2)
 
         return ProcessResultModel(
             exit_code=self._process.returncode if self._process else -1,
@@ -175,11 +172,7 @@ class ManagedProcess:
                 return
 
             with suppress(Exception):
-                try:
-                    self._process.communicate(timeout=2)
-                except TimeoutExpired:
-                    self._process.kill()
-                    self._process.communicate()
+                self._process.kill()
 
             logger.warning("[{}] Killed", self.title)
 
