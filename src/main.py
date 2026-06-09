@@ -79,8 +79,6 @@ def main() -> None:
     )
     window.show()
 
-    window.shutdown()
-
     exit_code = app.exec()
 
     if exit_code != 0:

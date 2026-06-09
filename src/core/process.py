@@ -8,7 +8,7 @@ from typing import Iterable
 from loguru import logger
 from pydantic import BaseModel
 
-DEFAULT_ERROR_FLAGS = ["error", "fail", "crash", "exception"]
+DEFAULT_ERROR_FLAGS = frozenset(("error", "fail", "crash", "exception"))
 
 
 class ProcessResultModel(BaseModel):
@@ -19,11 +19,10 @@ class ProcessResultModel(BaseModel):
 
 def is_error_line(
     line: str,
-    error_flags: Iterable[str] | None = None,
+    error_flags: Iterable[str],
 ) -> bool:
-    flags = error_flags or DEFAULT_ERROR_FLAGS
     lower = line.lower()
-    return any(flag in lower for flag in flags)
+    return any(flag in lower for flag in error_flags)
 
 
 def emit_log(
@@ -47,7 +46,7 @@ def consume_remaining_output(
     result: ProcessResultModel,
     *,
     capture_output: bool = False,
-    error_flags: Iterable[str] | None = None,
+    error_flags: Iterable[str],
     output_log_level: str = "INFO",
 ) -> None:
     if not process.stdout:
@@ -76,7 +75,7 @@ class ManagedProcess:
         *,
         timeout: int | None = None,
         cwd: str | Path | None = None,
-        error_flags: Iterable[str] | None = None,
+        error_flags: Iterable[str] = DEFAULT_ERROR_FLAGS,
         shell: bool = False,
         capture_output: bool = False,
         output_log_level: str = "INFO",

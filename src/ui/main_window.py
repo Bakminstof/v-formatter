@@ -5,7 +5,7 @@ from typing import Iterator
 import humanize
 from loguru import logger
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QCloseEvent, QIcon
 from PySide6.QtWidgets import (
     QApplication,
     QHBoxLayout,
@@ -129,10 +129,13 @@ class MainWindow(QMainWindow):
         self._init_version_widget()
         self._init_layout()
 
+        self.__on_startup()
+
     def __on_startup(self) -> None:
-        self.tasks.add_task(
-            callback=self.__git_updater.prepare_update,
-        )
+        pass
+        # self.tasks.add_task(
+        #     callback=self.__git_updater.prepare_update,
+        # )
 
     # ---------- UI Initialization ----------
     def _init_window(self) -> None:
@@ -424,8 +427,9 @@ class MainWindow(QMainWindow):
         self.elapsed_time_widget.stop()
         self.__concat_started = False
 
-    def shutdown(self) -> None:
+    def closeEvent(self, event: QCloseEvent) -> None:
         self.tasks.stop_all()
+        super().closeEvent(event)
 
     def _update_progress(self) -> None:
         percent = int((self.current_task_index / self.total_tasks) * 100 if self.total_tasks else 0)
