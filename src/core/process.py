@@ -1,7 +1,7 @@
 from contextlib import suppress
 from datetime import datetime, timedelta
 from pathlib import Path
-from subprocess import CREATE_NO_WINDOW, PIPE, STDOUT, Popen
+from subprocess import CREATE_NO_WINDOW, PIPE, STDOUT, Popen, TimeoutExpired
 from sys import platform
 from threading import Lock
 from typing import Iterable, Mapping
@@ -117,6 +117,8 @@ class ManagedProcess:
             line = line.strip()
             self._process_line(line, stdout, error_lines)
 
+        self._kill()
+
         return ProcessResultModel(
             exit_code=self._process.returncode if self._process else -1,
             stdout=stdout,
@@ -131,12 +133,22 @@ class ManagedProcess:
             stdout.append(line)
 
         is_error = is_error_line(line, self.error_flags)
-        emit_log(self.title, line, is_error=is_error, output_log_level=self.output_log_level)
+        emit_log(
+            self.title,
+            line,
+            is_error=is_error,
+            output_log_level=self.output_log_level,
+        )
 
         if is_error:
             error_lines.append(line)
 
-    def _read_remaining(self, process: Popen, stdout: list[str], error_lines: list[str]) -> None:
+    def _read_remaining(
+        self,
+        process: Popen,
+        stdout: list[str],
+        error_lines: list[str],
+    ) -> None:
         if not process.stdout:
             return
 
@@ -159,13 +171,21 @@ class ManagedProcess:
 
     def _kill(self) -> None:
         with self._lock:
-            if self._process and self._process.poll() is None:
-                with suppress(Exception):
+            if not self._process:
+                return
+
+            with suppress(Exception):
+                try:
+                    self._process.communicate(timeout=2)
+                except TimeoutExpired:
                     self._process.kill()
-                    self._process.wait(timeout=2)
+                    self._process.communicate()
 
             logger.warning("[{}] Killed", self.title)
 
     def kill(self) -> None:
+        if self._killed:
+            return
+
         self._killed = True
         self._kill()

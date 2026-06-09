@@ -81,8 +81,6 @@ class Worker(QThread):
             if not self._stop:
                 self.finished.emit(True)
 
-            self._process = None
-
         except Exception as e:
             logger.exception(
                 "[Dir:{}] Exception: {}",
@@ -91,6 +89,8 @@ class Worker(QThread):
                 exc_info=e,
             )
             self.finished.emit(False)
+
+        self.stop()
 
     def stop(self) -> None:
         self._stop = True
