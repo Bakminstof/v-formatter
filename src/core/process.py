@@ -74,7 +74,6 @@ class ManagedProcess:
         title: str,
         command: list[str | Path],
         *,
-        encoding: str = "UTF-8",
         timeout: int | None = None,
         cwd: str | Path | None = None,
         error_flags: Iterable[str] | None = None,
@@ -84,7 +83,6 @@ class ManagedProcess:
     ) -> None:
         self.title = title
         self.command = command
-        self.encoding = encoding
         self.timeout = timeout
         self.cwd = cwd
         self.error_flags = error_flags
@@ -110,7 +108,6 @@ class ManagedProcess:
             stderr=STDOUT,
             cwd=self.cwd,
             text=True,
-            encoding=self.encoding,
             shell=self.shell,
             bufsize=1,
             creationflags=CREATE_NO_WINDOW if platform == "win32" else 0,
