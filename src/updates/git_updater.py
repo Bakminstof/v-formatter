@@ -1,6 +1,7 @@
 import sys
 import time
 from pathlib import Path
+from re import search as re_search
 from shutil import copy2
 from subprocess import CREATE_NEW_PROCESS_GROUP, Popen
 from sys import platform
@@ -42,6 +43,9 @@ class GitUpdater:
         try:
             self.repo = git.Repo(repo_path, search_parent_directories=False)
             logger.info("Git-репозиторий обнаружен: {}", repo_path)
+
+            self.convert_origin_to_https()
+
         except git.InvalidGitRepositoryError:
             logger.warning("Папка не является Git-репозиторием: {}", repo_path)
 
@@ -218,3 +222,19 @@ class GitUpdater:
         Popen(args, shell=True, creationflags=creationflags, close_fds=True)
 
         exit(0)
+
+    def convert_origin_to_https(self) -> None:
+        origin = self.repo.remote(name="origin")
+        current_url = origin.url
+
+        if current_url.startswith("git@") or "://" not in current_url:
+            match = re_search(r"(?:ssh://)?git@([^:/]+)[:/](.+)$", current_url)
+
+            if match:
+                domain = match.group(1)
+                path = match.group(2)
+                new_url = f"https://{domain}/{path}"
+
+                origin.set_url(new_url)
+
+                logger.debug("[{}] origin url update to: {}", self, new_url)
