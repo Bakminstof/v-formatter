@@ -1,3 +1,4 @@
+from contextlib import suppress
 from datetime import datetime, timedelta
 from pathlib import Path
 from subprocess import CREATE_NO_WINDOW, PIPE, STDOUT, Popen
@@ -17,54 +18,17 @@ class ProcessResultModel(BaseModel):
     error_lines: list[str] = []
 
 
-def is_error_line(
-    line: str,
-    error_flags: Iterable[str],
-) -> bool:
+def is_error_line(line: str, error_flags: Iterable[str]) -> bool:
     lower = line.lower()
     return any(flag in lower for flag in error_flags)
 
 
-def emit_log(
-    title: str,
-    line: str,
-    *,
-    is_error: bool,
-    output_log_level: str = "INFO",
-) -> None:
+def emit_log(title: str, line: str, *, is_error: bool, output_log_level: str = "INFO") -> None:
     prefix = f"[{title}] {line}"
-
     if is_error:
         logger.error("{}", prefix)
     else:
         logger.log(output_log_level, "{}", prefix)
-
-
-def consume_remaining_output(
-    title: str,
-    process: Popen,
-    result: ProcessResultModel,
-    *,
-    capture_output: bool = False,
-    error_flags: Iterable[str],
-    output_log_level: str = "INFO",
-) -> None:
-    if not process.stdout:
-        return
-
-    for raw in process.stdout.readlines():  # type: str
-        line = raw.strip()
-        if not line:
-            continue
-
-        is_error = is_error_line(line, error_flags)
-        emit_log(title, line, is_error=is_error, output_log_level=output_log_level)
-
-        if is_error:
-            result.error_lines.append(line)
-
-        if capture_output:
-            result.stdout.append(line)
 
 
 class ManagedProcess:
@@ -73,21 +37,25 @@ class ManagedProcess:
         title: str,
         command: list[str | Path],
         *,
+        encoding: str = "utf-8",
         timeout: int | None = None,
         cwd: str | Path | None = None,
         error_flags: Iterable[str] = DEFAULT_ERROR_FLAGS,
         shell: bool = False,
         capture_output: bool = False,
         output_log_level: str = "INFO",
+        max_stdout_lines: int = 1000,
     ) -> None:
         self.title = title
         self.command = command
         self.timeout = timeout
         self.cwd = cwd
+        self.encoding = encoding
         self.error_flags = error_flags
         self.shell = shell
         self.capture_output = capture_output
         self.output_log_level = output_log_level
+        self.max_stdout_lines = max_stdout_lines
 
         self._lock = Lock()
         self._process: Popen | None = None
@@ -98,7 +66,7 @@ class ManagedProcess:
             self.output_log_level,
             "[{}] Command: {}",
             self.title,
-            " ".join([str(i) for i in self.command]),
+            " ".join(str(i) for i in self.command),
         )
 
         self._process = Popen(
@@ -107,6 +75,8 @@ class ManagedProcess:
             stderr=STDOUT,
             cwd=self.cwd,
             text=True,
+            encoding=self.encoding,
+            errors="replace",
             shell=self.shell,
             bufsize=1,
             creationflags=CREATE_NO_WINDOW if platform == "win32" else 0,
@@ -118,57 +88,81 @@ class ManagedProcess:
         deadline = datetime.now() + timedelta(seconds=self.timeout or 0)
         has_timeout = self.timeout is not None
 
-        while self._process.poll() is None:
+        while True:
+            if self._killed:
+                self._kill()
+                break
+
             if has_timeout and datetime.now() > deadline:
                 logger.error("[{}] Timeout exceeded", self.title)
-                self.kill()
+                self._kill()
                 break
 
-            if self._killed:
-                self.kill()
+            if self._process.poll() is not None:
+                self._read_remaining(self._process, stdout, error_lines)
                 break
 
-            raw = self._process.stdout.readline() if self._process.stdout else ""
-            line = raw.strip()
+            try:
+                line = self._process.stdout.readline()
+            except Exception as e:
+                logger.error("[{}] Readline error: {}", self.title, str(e))
+                break
 
             if not line:
                 continue
 
-            if self.capture_output:
-                stdout.append(line)
+            line = line.strip()
+            self._process_line(line, stdout, error_lines)
 
-            is_error = is_error_line(line, self.error_flags)
-            emit_log(
-                self.title,
-                line,
-                is_error=is_error,
-                output_log_level=self.output_log_level,
-            )
-
-            if is_error:
-                error_lines.append(line)
-
-        result = ProcessResultModel(
+        return ProcessResultModel(
             exit_code=self._process.returncode if self._process else -1,
             stdout=stdout,
             error_lines=error_lines,
         )
 
-        consume_remaining_output(
-            self.title,
-            self._process,
-            result,
-            error_flags=self.error_flags,
-            capture_output=self.capture_output,
-            output_log_level=self.output_log_level,
-        )
-        return result
+    def _process_line(self, line: str, stdout: list[str], error_lines: list[str]) -> None:
+        if self.capture_output:
+            if len(stdout) >= self.max_stdout_lines:
+                stdout.pop(0)
+
+            stdout.append(line)
+
+        is_error = is_error_line(line, self.error_flags)
+        emit_log(self.title, line, is_error=is_error, output_log_level=self.output_log_level)
+
+        if is_error:
+            error_lines.append(line)
+
+    def _read_remaining(self, process: Popen, stdout: list[str], error_lines: list[str]) -> None:
+        if not process.stdout:
+            return
+
+        try:
+            while True:
+                line = process.stdout.readline()
+                if not line:
+                    break
+                line = line.strip()
+
+                self._process_line(line, stdout, error_lines)
+
+        except ValueError:
+            pass
+        except Exception as e:
+            logger.error("[{}] Error reading remaining output: {}", self.title, e)
+        finally:
+            with suppress(Exception):
+                process.stdout.close()
+
+    def _kill(self) -> None:
+        with self._lock:
+            if self._process and self._process.poll() is None:
+                with suppress(Exception):
+                    self._process.kill()
+                    self._process.wait(timeout=2)
+
+            logger.warning("[{}] Killed", self.title)
 
     def kill(self) -> None:
-        with self._lock:
-            self._killed = True
-
-            if self._process and self._process.poll() is None:
-                self._process.kill()
-
-                logger.warning("[{}] Killed", self.title)
+        self._killed = True
+        self._kill()
