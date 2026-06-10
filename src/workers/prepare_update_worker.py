@@ -13,13 +13,11 @@ class PrepareUpdateWorker(QThread):
         self,
         git_updater: GitUpdater,
         version_tag: str,
-        switch_only: bool = False,
     ) -> None:
         super().__init__()
 
         self.git_updater = git_updater
 
-        self.switch_only = switch_only
         self.version = version_tag
 
     def run(self) -> None:

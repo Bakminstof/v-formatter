@@ -2,9 +2,7 @@ import sys
 import time
 from pathlib import Path
 from re import search as re_search
-from shutil import copy2
-from subprocess import CREATE_NEW_PROCESS_GROUP, Popen
-from sys import platform
+from subprocess import Popen
 
 import git
 import humanize
@@ -118,18 +116,53 @@ class GitUpdater:
             f"{self.github_owner}/{self.github_repo}/releases/latest"
         )
         try:
-            resp = requests.get(url, timeout=10)
+            resp = requests.get(url, timeout=20)
             resp.raise_for_status()
             data = resp.json()
             return data.get("tag_name"), data.get("html_url")
         except Exception as e:
-            logger.error("Ошибка при запросе последнего релиза: {}", e)
+            logger.error("Ошибка при запросе последнего релиза: {}", str(e))
             return None, None
 
-    def fetch(self) -> bool:
-        try:
-            logger.info("[{}] Fetching updates", self)
+    def cleanup(self) -> bool:
+        logger.info("[{}] Cleanup start", self)
 
+        start = time.monotonic()
+
+        try:
+            logger.info("[{}] Cleanup start", self)
+
+            ManagedProcess(
+                f"{self}|Clean",
+                [self.repo.git.GIT_PYTHON_GIT_EXECUTABLE, "clean", "-fd"],
+                error_flags=(),
+            ).run()
+
+            ManagedProcess(
+                f"{self}|Reset",
+                [self.repo.git.GIT_PYTHON_GIT_EXECUTABLE, "reset", "--hard"],
+                error_flags=(),
+            ).run()
+
+            elapsed = time.monotonic() - start
+
+            logger.success(
+                "[{}] Cleanup success at {}",
+                self,
+                humanize.precisedelta(elapsed),
+            )
+
+            return True
+        except Exception as e:
+            logger.error("[{}] Cleanup  failed: {}", self, str(e))
+            return False
+
+    def fetch(self) -> bool:
+        logger.info("[{}] Fetching updates", self)
+
+        start = time.monotonic()
+
+        try:
             ManagedProcess(
                 f"{self}|Fetch",
                 [
@@ -140,6 +173,7 @@ class GitUpdater:
                     "--prune-tags",
                     "--progress",
                 ],
+                error_flags=(),
             ).run()
 
             logger.info("[{}|LFS Fetch] Starting fetch", self)
@@ -147,23 +181,27 @@ class GitUpdater:
             ManagedProcess(
                 f"{self}|LFS Fetch",
                 [self.repo.git.GIT_PYTHON_GIT_EXECUTABLE, "lfs", "fetch"],
+                error_flags=(),
             ).run()
 
             logger.info("[{}|LFS Fetch] Done!", self)
 
-            logger.success("[{}] Fetch updates done", self)
+            elapsed = time.monotonic() - start
+
+            logger.success(
+                "[{}] Fetch updates done at {}",
+                self,
+                humanize.precisedelta(elapsed),
+            )
 
             return True
         except Exception as e:
             logger.error("[{}] Fetch updates failed: {}", self, str(e))
             return False
 
-    def prepare_update(self) -> Path:
-        update_entrypoint_file_name = "DoUpdate.ps1"
-        update_entrypoint_file = self.updater_tmp_dir / update_entrypoint_file_name
-
+    def prepare_update(self) -> None:
         if self._prepared:
-            return update_entrypoint_file
+            return
 
         logger.debug("[{}] Prepare updates start", self)
 
@@ -184,22 +222,6 @@ class GitUpdater:
 
         self.updater_tmp_dir.mkdir(exist_ok=True, parents=True)
 
-        copy2(
-            Path(__file__).parent / update_entrypoint_file_name,
-            update_entrypoint_file,
-            follow_symlinks=False,
-        )
-
-        ManagedProcess(
-            f"{self}|Clean",
-            [self.repo.git.GIT_PYTHON_GIT_EXECUTABLE, "clean", "-fd"],
-        ).run()
-
-        ManagedProcess(
-            f"{self}|Reset",
-            [self.repo.git.GIT_PYTHON_GIT_EXECUTABLE, "reset", "--hard"],
-        ).run()
-
         elapsed = time.monotonic() - start
 
         logger.info(
@@ -209,52 +231,34 @@ class GitUpdater:
         )
 
         self.fetch()
+        self.cleanup()
 
         self._prepared = True
 
-        return update_entrypoint_file
-
-    def launch_updater_and_exit(
-        self,
-        update_entrypoint_file: Path,
-        target_tag: str,
-        switch_only: bool = False,
-    ) -> None:
-        if platform == "win32":
-            creationflags = CREATE_NEW_PROCESS_GROUP
-        else:
-            creationflags = 0
-
+    def launch_updater(self, target_tag: str) -> None:
         git_bin = self.tools_tmp_dir / self.portable_git_base_dir.name / "bin" / "git.exe"
 
         args = [
-            "powershell",
-            "-executionpolicy",
-            "bypass",
-            "-file",
-            update_entrypoint_file,
-            "-RepoPath",
-            self.repo_path,
-            "-GitBin",
             git_bin,
-            "-TargetTag",
+            "switch",
+            "--progress",
+            "-fqd",
             target_tag,
-            "-Python",
+            "&&",
             sys.executable,
-            "-MainScript",
-            sys.argv[0],
+            *sys.argv,
         ]
 
-        if switch_only:
-            args.append("-SwitchOnly")
+        logger.info("[{}] Launch updater: {}", self, " ".join(map(str, args)))
 
-        if len(sys.argv) > 1:
-            args.append("--")
-            args.extend(sys.argv[1:])
-
-        Popen(args, shell=True, creationflags=creationflags, close_fds=True)
-
-        exit(0)
+        Popen(
+            args,
+            encoding="utf-8",
+            errors="replace",
+            start_new_session=True,
+            cwd=self.repo_path,
+            shell=True,
+        )
 
     def convert_origin_to_https(self) -> None:
         origin = self.repo.remote(name="origin")

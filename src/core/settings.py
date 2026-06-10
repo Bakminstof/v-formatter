@@ -33,7 +33,7 @@ class LoggingSettings(BaseModel):
 
     console_format: str = "<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | {message}"
 
-    file_path: Path = LOGS_DIR / "contact.log"
+    file_path: Path = LOGS_DIR / f"{APP_NAME}.log"
 
     @field_validator("file_path")
     @classmethod

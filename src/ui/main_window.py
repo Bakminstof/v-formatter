@@ -294,15 +294,14 @@ class MainWindow(QMainWindow):
             QMessageBox.Yes | QMessageBox.No,
         )
         if reply == QMessageBox.Yes:
-            self._launch_updater(version_tag, switch_only=True)
+            self._launch_updater(version_tag)
 
-    def _on_update_prepared(self, entrypoint_file: Path) -> None:
+    def _on_update_prepared(self) -> None:
         self._progress_dialog.close()
-        self.__git_updater.launch_updater_and_exit(
-            entrypoint_file,
+        self.__git_updater.launch_updater(
             self._prepare_worker.version,
-            self._prepare_worker.switch_only,
         )
+        self.close()
 
     def _on_update_prepare_error(self, error_msg: str) -> None:
         """Обрабатывает ошибку подготовки."""
@@ -314,7 +313,7 @@ class MainWindow(QMainWindow):
         self._progress_dialog.close()
 
     # ---------- Worker control ----------
-    def _launch_updater(self, version_tag: str, switch_only: bool = False) -> None:
+    def _launch_updater(self, version_tag: str) -> None:
         self._progress_dialog = QProgressDialog(
             "Подготовка обновления...",
             "Отмена",
@@ -332,7 +331,6 @@ class MainWindow(QMainWindow):
         self._prepare_worker = PrepareUpdateWorker(
             self.__git_updater,
             version_tag,
-            switch_only,
         )
         self._prepare_worker.finished.connect(self._on_update_prepared)
         self._prepare_worker.error.connect(self._on_update_prepare_error)
