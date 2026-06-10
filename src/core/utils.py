@@ -33,6 +33,7 @@ def local_to_utc_time(local_time_str: str) -> str:
 
 def parse_args() -> ArgsModel:
     parser = ArgumentParser()
+    parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args()
     return ArgsModel.model_validate(vars(args))
 

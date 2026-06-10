@@ -21,7 +21,7 @@ class TimeIntervalWidget(QWidget):
         super().__init__(parent)
 
         self.checkbox = QCheckBox(label)
-        self.checkbox.setChecked(False)
+        self.checkbox.setChecked(True)
         self.checkbox.toggled.connect(self._on_checkbox_toggled)
 
         from_time = from_time.split(":")
@@ -36,7 +36,7 @@ class TimeIntervalWidget(QWidget):
         self.to_time.setDisplayFormat("HH:mm")
         self.to_time.setTime(QTime(int(to_time[0]), int(to_time[1])))
 
-        self._on_checkbox_toggled(False)
+        self._on_checkbox_toggled(True)
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)

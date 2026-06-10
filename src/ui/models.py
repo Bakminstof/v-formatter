@@ -6,6 +6,7 @@ from pathlib import Path
 from re import match
 
 from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic_core.core_schema import ValidationInfo
 
 
 class Lang(StrEnum):
@@ -54,9 +55,15 @@ class TimeFilterModel(BaseModel):
 
     @field_validator("time_from", "time_to", mode="before")
     @classmethod
-    def time_validator(cls, v: str | None) -> str:
+    def time_validator(cls, v: str | None, info: ValidationInfo[str]) -> str:
         if v is None:
-            return "00:00"
+            if info.field_name == "time_from":
+                return "00:00"
+
+            if info.field_name == "time_to":
+                return "23:59"
+
+            raise RuntimeError(f"Invalid time field name value: {info.field_name}")
 
         if match(r"^\d{2}:\d{2}$", v):
             return v

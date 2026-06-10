@@ -190,6 +190,16 @@ class GitUpdater:
             follow_symlinks=False,
         )
 
+        ManagedProcess(
+            f"{self}|Clean",
+            [self.repo.git.GIT_PYTHON_GIT_EXECUTABLE, "clean", "-fd"],
+        ).run()
+
+        ManagedProcess(
+            f"{self}|Reset",
+            [self.repo.git.GIT_PYTHON_GIT_EXECUTABLE, "reset", "--hard"],
+        ).run()
+
         elapsed = time.monotonic() - start
 
         logger.info(

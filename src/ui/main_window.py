@@ -52,6 +52,7 @@ class MainWindow(QMainWindow):
         locales_dir: Path,
         local_meta_file_path: Path,
         *,
+        log_level: str = "INFO",
         app_info: AppInfoModel,
         git_updater: GitUpdater,
         video_concatenator: VideoConcatenator,
@@ -62,6 +63,7 @@ class MainWindow(QMainWindow):
 
         self._app_info = app_info
 
+        self.__log_level = log_level
         self.__temp_dir = temp_dir
         self.__encoding = encoding
 
@@ -163,7 +165,7 @@ class MainWindow(QMainWindow):
 
     def _init_log_container(self) -> None:
         self.log_widget = LogWidget()
-        self.log_handler = QtLogHandler()
+        self.log_handler = QtLogHandler(self.__log_level)
         self.log_handler.log_signal.connect(self.log_widget.append_log)
 
     def _init_buttons(self):
@@ -388,6 +390,8 @@ class MainWindow(QMainWindow):
             logger.warning("Concat is already started.")
             return
 
+        self._save_current_meta()
+
         self.__concat_started = True
 
         if self.local_meta.input_dir is None or self.local_meta.output_dir is None:
@@ -422,7 +426,7 @@ class MainWindow(QMainWindow):
 
     def stop(self) -> None:
         if getattr(self, "worker", None) is not None:
-            self.worker.stop()
+            self.worker.stop(kill=True)
 
         self.elapsed_time_widget.stop()
         self.__concat_started = False

@@ -1,7 +1,7 @@
 from contextlib import suppress
 from datetime import datetime, timedelta
 from pathlib import Path
-from subprocess import CREATE_NO_WINDOW, PIPE, STDOUT, Popen, TimeoutExpired
+from subprocess import CREATE_NO_WINDOW, PIPE, STDOUT, Popen
 from sys import platform
 from threading import Lock
 from typing import Iterable, Mapping
@@ -114,7 +114,7 @@ class ManagedProcess:
             self._process_line(line, stdout, error_lines)
 
         with suppress(Exception):
-            self._process.wait(2)
+            self._process.wait(10)
 
         return ProcessResultModel(
             exit_code=self._process.returncode if self._process else -1,

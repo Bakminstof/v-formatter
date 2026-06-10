@@ -71,6 +71,7 @@ def main() -> None:
         settings.i18n.default_locale,
         settings.i18n.locales_dir,
         settings.local.meta_file_path,
+        log_level="DEBUG" if args.verbose else "INFO",
         app_info=settings.app_info,
         video_concatenator=video_concatenator,
         meta_processor=meta_processor,

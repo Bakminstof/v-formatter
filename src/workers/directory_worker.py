@@ -90,12 +90,10 @@ class Worker(QThread):
             )
             self.finished.emit(False)
 
-        self.stop()
-
-    def stop(self) -> None:
+    def stop(self, kill: bool = False) -> None:
         self._stop = True
 
-        if self._process is not None:
+        if kill and self._process is not None:
             self._process.kill()
 
         self._process = None

@@ -9,11 +9,11 @@ from ui.models import LOG_COLORS
 class QtLogHandler(QObject):
     log_signal = Signal(str, str)
 
-    def __init__(self) -> None:
+    def __init__(self, log_level: str) -> None:
         super().__init__()
         logger.add(
             self._emit,
-            level="INFO",
+            level=log_level,
             format="{time:HH:mm:ss} | {level} | {message}",
             colorize=False,
         )

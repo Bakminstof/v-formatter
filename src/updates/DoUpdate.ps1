@@ -113,9 +113,7 @@ elseif (-not (Test-Path $GitBin)) {
 }
 Write-Log "Using Git: $GitBin"
 
-Invoke-CommandSafe -Command @($GitBin, "checkout", "-f", "tags/$TargetTag") -WorkingDirectory $RepoPath
-Invoke-CommandSafe -Command @($GitBin, "clean", "-fd") -WorkingDirectory $RepoPath
-Invoke-CommandSafe -Command @($GitBin, "reset", "--hard") -WorkingDirectory $RepoPath
+Invoke-CommandSafe -Command @($GitBin, "switch", "-f", "-q","--detach", $TargetTag) -WorkingDirectory $RepoPath
 
 $originalArgs = @()
 if ($RemainingArguments -and $RemainingArguments.Count -gt 0) {
