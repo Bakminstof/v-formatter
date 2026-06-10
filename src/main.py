@@ -9,9 +9,8 @@ ROOT_DIR_PATH_STR = ROOT_DIR.absolute().as_posix()
 
 GIT_DIR = REPOSITORY_ROOT / "tools" / "PortableGit" / "cmd"
 GIT_DIR_STR = GIT_DIR.absolute().as_posix()
-GIT_PYTHON_GIT_EXECUTABLE_STR = (GIT_DIR / "git.exe").resolve(True).absolute().as_posix()
 
-env["GIT_PYTHON_GIT_EXECUTABLE"] = GIT_PYTHON_GIT_EXECUTABLE_STR
+env["GIT_PYTHON_GIT_EXECUTABLE"] = (GIT_DIR / "git.exe").resolve(True).absolute().as_posix()
 
 path.append(GIT_DIR_STR)
 path.append(ROOT_DIR_PATH_STR)

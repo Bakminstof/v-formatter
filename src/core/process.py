@@ -1,4 +1,3 @@
-from contextlib import suppress
 from datetime import datetime, timedelta
 from pathlib import Path
 from subprocess import CREATE_NO_WINDOW, PIPE, STDOUT, Popen
@@ -113,8 +112,7 @@ class ManagedProcess:
             line = line.strip()
             self._process_line(line, stdout, error_lines)
 
-        with suppress(Exception):
-            self._process.wait(10)
+        self._process.wait(10)
 
         return ProcessResultModel(
             exit_code=self._process.returncode if self._process else -1,
@@ -163,16 +161,14 @@ class ManagedProcess:
         except Exception as e:
             logger.error("[{}] Error reading remaining output: {}", self.title, e)
         finally:
-            with suppress(Exception):
-                process.stdout.close()
+            process.stdout.close()
 
     def _kill(self) -> None:
         with self._lock:
             if not self._process:
                 return
 
-            with suppress(Exception):
-                self._process.kill()
+            self._process.kill()
 
             logger.warning("[{}] Killed", self.title)
 
