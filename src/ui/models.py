@@ -1,24 +1,24 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from enum import StrEnum
-from pathlib import Path
-from re import match
-
-from pydantic import BaseModel, ConfigDict, field_validator
-from pydantic_core.core_schema import ValidationInfo
 
 
 class Lang(StrEnum):
     ru_RU = "ru_RU"
 
 
-class Status(StrEnum):
+class ConcatStatus(StrEnum):
     waiting = "⏳"
     processing = "⚙️"
     done = "✅"
     error = "❌"
     unknown = "❓"
+
+
+class VersionStatus(StrEnum):
+    actual = "✅"
+    cant_check = "⦿"
+    need_update = "⬆️"
 
 
 LOG_COLORS = {
@@ -31,53 +31,3 @@ LOG_COLORS = {
     "CRITICAL": "#E91E63",
     "-DEFAULT-": "#FFFFFF",
 }
-
-
-@dataclass(frozen=True)
-class VideoFormat:
-    label: str
-    extension: str
-
-
-VIDEO_FORMATS: list[VideoFormat] = [
-    VideoFormat("MP4 (H.264)", "mp4"),
-    VideoFormat("MKV", "mkv"),
-    VideoFormat("AVI", "avi"),
-    VideoFormat("3GP", "3gp"),
-]
-
-
-class TimeFilterModel(BaseModel):
-    model_config = ConfigDict(validate_default=True)
-
-    time_from: str | None = None
-    time_to: str | None = None
-
-    @field_validator("time_from", "time_to", mode="before")
-    @classmethod
-    def time_validator(cls, v: str | None, info: ValidationInfo[str]) -> str:
-        if v is None:
-            if info.field_name == "time_from":
-                return "00:00"
-
-            if info.field_name == "time_to":
-                return "23:59"
-
-            raise RuntimeError(f"Invalid time field name value: {info.field_name}")
-
-        if match(r"^\d{2}:\d{2}$", v):
-            return v
-
-        raise ValueError(f"Invalid time value: {v}")
-
-
-class FiltersModel(BaseModel):
-    time: TimeFilterModel = TimeFilterModel()
-
-
-class LocalMetaModel(BaseModel):
-    input_dir: Path | None = None
-    output_dir: Path | None = None
-    video_format: str = "3gp"
-
-    filters: FiltersModel = FiltersModel()

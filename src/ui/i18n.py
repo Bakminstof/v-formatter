@@ -25,11 +25,21 @@ class I18n:
     def __init__(
         self,
         lang: Lang,
-        encoding: str,
         locales_dir: Path,
+        encoding: str = "utf-8",
     ) -> None:
         path = locales_dir / f"{lang}.json"
         self.data: dict[str, str] = loads(path.read_text(encoding=encoding))
 
-    def t(self, key: str) -> str:
-        return self.data.get(key, key)
+    def t(self, key: str, *args: str) -> str:
+        parts = key.split(".")
+
+        res: dict | str | None = None
+        for part in parts:
+            if res is None:
+                res = self.data[part]
+            else:
+                res = res[part]
+
+        res: str
+        return res.format(*args)

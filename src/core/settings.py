@@ -20,8 +20,7 @@ TOOLS_DIR = BASE_DIR.parent / "tools"
 TMP_DIR = Path(gettempdir()).resolve(True) / APP_NAME
 TMP_DIR.mkdir(exist_ok=True, parents=True)
 
-LOCAL_DATA_DIR = BASE_DIR.parent / "local"
-DB_DIR = LOCAL_DATA_DIR / "db"
+DB_DIR = BASE_DIR.parent / "db"
 
 
 class LoggingSettings(BaseModel):
@@ -55,7 +54,7 @@ class LoggingSettings(BaseModel):
 class DBSettings(BaseModel):
     model_config = ConfigDict(validate_default=True)
 
-    path: Path = DB_DIR / "registry.db"
+    path: Path = DB_DIR / "local.db"
 
     @field_validator("path")
     @classmethod
@@ -70,10 +69,6 @@ class I18nSettings(BaseModel):
     locales_dir: Path = BASE_DIR.parent / "locales"
 
     default_locale: Lang = Lang.ru_RU
-
-
-class LocalSettings(BaseModel):
-    meta_file_path: Path = LOCAL_DATA_DIR / "meta.json"
 
 
 class UISettings(BaseModel):
@@ -110,8 +105,6 @@ class Settings(BaseSettings):
 
     default_encoding: str = DEFAULT_ENCODING
 
-    default_temp_dir: Path = TMP_DIR
-
     source_list_filename: str = "list.txt"
     ignore: set[str] = {".gitkeep"}
 
@@ -119,7 +112,6 @@ class Settings(BaseSettings):
     ffprobe: Path = BINARIES_DIR / "ffprobe.exe"
 
     logging: LoggingSettings = LoggingSettings()
-    local: LocalSettings = LocalSettings()
     i18n: I18nSettings = I18nSettings()
     ui: UISettings = UISettings()
     db: DBSettings = DBSettings()

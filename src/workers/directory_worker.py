@@ -9,7 +9,7 @@ from core.meta import VideoMetaProcessor
 from core.process import ManagedProcess
 
 
-class Worker(QThread):
+class DirectoryWorker(QThread):
     finished = Signal(bool)
 
     def __init__(

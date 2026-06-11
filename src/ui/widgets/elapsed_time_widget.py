@@ -8,7 +8,7 @@ class ElapsedTimeWidget(QWidget):
     def __init__(self, label: str) -> None:
         super().__init__()
 
-        self._start_time: float | None = None
+        self._start_time: float | int | None = None
 
         self._label = QLabel(label)
         self._time_label = QLabel("00:00")
@@ -52,3 +52,8 @@ class ElapsedTimeWidget(QWidget):
             self._time_label.setText(f"{hours:02}:{minutes:02}:{seconds:02}")
         else:
             self._time_label.setText(f"{minutes:02}:{seconds:02}")
+
+
+class ElapsedTimeManger:
+    def __init__(self, label: str) -> None:
+        self.widget = ElapsedTimeWidget(label)

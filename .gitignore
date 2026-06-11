@@ -13,4 +13,4 @@ __pycache__/
 
 # Local
 logs/
-local
+db/

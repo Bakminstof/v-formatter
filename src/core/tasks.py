@@ -1,32 +1,15 @@
 from typing import Callable
 
-from workers.periodic_worker import TaskWorker
+from PySide6.QtCore import QRunnable, Slot
 
 
-class TaskManager:
-    def __init__(self) -> None:
-        self._tasks: list[TaskWorker] = []
+class Runnable(QRunnable):
+    def __init__(self, func: Callable, *args, **kwargs) -> None:
+        super().__init__()
+        self.func = func
+        self.args = args
+        self.kwargs = kwargs
 
-    def add_task(
-        self,
-        interval_s: int = 0,
-        *,
-        callback: Callable,
-        callback_args: tuple | None = None,
-        callback_kwargs: dict | None = None,
-    ) -> TaskWorker:
-        worker = TaskWorker(
-            interval_s,
-            callback=callback,
-            callback_args=callback_args,
-            callback_kwargs=callback_kwargs,
-        )
-
-        self._tasks.append(worker)
-        worker.start()
-
-        return worker
-
-    def stop_all(self) -> None:
-        for worker in self._tasks:
-            worker.stop()
+    @Slot()
+    def run(self):
+        self.func(*self.args, **self.kwargs)

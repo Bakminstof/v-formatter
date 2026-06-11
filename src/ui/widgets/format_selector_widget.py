@@ -3,15 +3,15 @@ from typing import Callable
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QSizePolicy, QWidget
 
-from ui.models import VIDEO_FORMATS
+from core.models import VIDEO_FORMATS, MetadataModel, VideoFormat
 
 
 class FormatSelectorWidget(QWidget):
     def __init__(
         self,
         label: str,
-        initial_value: str,
         on_change: Callable[[str], None] | None = None,
+        formats: tuple[VideoFormat, ...] = VIDEO_FORMATS,
     ) -> None:
         super().__init__()
 
@@ -20,13 +20,10 @@ class FormatSelectorWidget(QWidget):
         label_widget = QLabel(label)
         self.combo = QComboBox()
 
-        for fmt in VIDEO_FORMATS:
+        for fmt in formats:
             self.combo.addItem(fmt.label, fmt.extension)
 
-        index = self.combo.findData(initial_value)
-        if index >= 0:
-            self.combo.setCurrentIndex(index)
-
+        self.combo.setCurrentIndex(0)
         self.combo.setSizePolicy(
             QSizePolicy.Policy.Fixed,
             QSizePolicy.Policy.Fixed,
@@ -45,6 +42,11 @@ class FormatSelectorWidget(QWidget):
 
         self.setLayout(layout)
 
+    def set_current_value(self, value: str) -> None:
+        index = self.combo.findData(value)
+        if index >= 0:
+            self.combo.setCurrentIndex(index)
+
     def _emit_change(self) -> None:
         if self._on_change:
             self._on_change(self.current_value)
@@ -52,3 +54,21 @@ class FormatSelectorWidget(QWidget):
     @property
     def current_value(self) -> str:
         return self.combo.currentData()
+
+
+class FormatSelectorManager:
+    def __init__(
+        self,
+        metadata_cache_getter: Callable[[], MetadataModel],
+        label: str,
+        formats: tuple[VideoFormat, ...] = VIDEO_FORMATS,
+    ) -> None:
+        self.__metadata_cache = metadata_cache_getter
+
+        self.widget = FormatSelectorWidget(label, self.__on_change, formats)
+
+    def startup(self) -> None:
+        self.widget.set_current_value(self.__metadata_cache().video_format)
+
+    def __on_change(self, fmt: str) -> None:
+        self.__metadata_cache().video_format = fmt

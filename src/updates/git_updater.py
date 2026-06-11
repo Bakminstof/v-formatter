@@ -36,7 +36,7 @@ class GitUpdater:
         self.updater_tmp_dir = updater_tmp_dir
         self.tools_tmp_dir = tools_tmp_dir
 
-        self._versions_data: VersionsInfoModel | None = None
+        self._versions_data = VersionsInfoModel()
 
         try:
             self.repo = git.Repo(repo_path, search_parent_directories=False)
@@ -56,7 +56,7 @@ class GitUpdater:
     def is_git_repo(self) -> bool:
         return self.repo is not None
 
-    def startup(self) -> None:
+    def startup(self) -> VersionsInfoModel:
         latest_version = None
 
         if self.is_git_repo():
@@ -67,14 +67,14 @@ class GitUpdater:
             current_version = UNKNOWN_VERSION
             all_versions = [current_version]
 
-        self._versions_data = VersionsInfoModel(
-            current=current_version,
-            latest=latest_version or UNKNOWN_VERSION,
-            all=all_versions,
-        )
+        self._versions_data.current = current_version
+        self._versions_data.latest = latest_version or UNKNOWN_VERSION
+        self._versions_data.all = all_versions
+
+        return self._versions_data
 
     @property
-    def versions_data(self) -> VersionsInfoModel | None:
+    def versions_data(self) -> VersionsInfoModel:
         return self._versions_data
 
     def get_all_version_tags(self) -> list[str]:
@@ -130,19 +130,17 @@ class GitUpdater:
         start = time.monotonic()
 
         try:
-            logger.info("[{}] Cleanup start", self)
-
-            ManagedProcess(
-                f"{self}|Clean",
-                [self.repo.git.GIT_PYTHON_GIT_EXECUTABLE, "clean", "-fd"],
-                error_flags=(),
-            ).run()
-
-            ManagedProcess(
-                f"{self}|Reset",
-                [self.repo.git.GIT_PYTHON_GIT_EXECUTABLE, "reset", "--hard"],
-                error_flags=(),
-            ).run()
+            # ManagedProcess(
+            #     f"{self}|Clean",
+            #     [self.repo.git.GIT_PYTHON_GIT_EXECUTABLE, "clean", "-fd"],
+            #     error_flags=(),
+            # ).run()
+            #
+            # ManagedProcess(
+            #     f"{self}|Reset",
+            #     [self.repo.git.GIT_PYTHON_GIT_EXECUTABLE, "reset", "--hard"],
+            #     error_flags=(),
+            # ).run()
 
             elapsed = time.monotonic() - start
 

@@ -47,3 +47,10 @@ class LogWidget(QTextEdit):
         html = f'<span style="color:{color}">{message}</span>'
         self.append(html)
         self.moveCursor(QTextCursor.End)
+
+
+class LogManager:
+    def __init__(self, log_level: str) -> None:
+        self.widget = LogWidget()
+        self.handler = QtLogHandler(log_level)
+        self.handler.log_signal.connect(self.widget.append_log)
