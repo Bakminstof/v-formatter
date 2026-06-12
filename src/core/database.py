@@ -33,13 +33,13 @@ class TableRegistry:
 
 class Registry:
     __initialized = False
+    __closed = False
 
     def __init__(self, db_path: Path, *tables: type[TableRegistry]) -> None:
         self._db_path = db_path
         self._db_path_str = self._db_path.absolute().as_posix()
         self._local = threading_local()
         self._connections: set[Connection] = set()
-        self._closed = False
         self.__tables = tables
 
     def __str__(self) -> str:
@@ -50,7 +50,7 @@ class Registry:
 
     @property
     def connection(self) -> Connection:
-        if self._closed:
+        if self.__closed:
             raise RuntimeError("Registry is closed")
 
         if not hasattr(self._local, "con"):
@@ -76,14 +76,15 @@ class Registry:
             init_con.close()
 
         self.__initialized = True
+        self.__closed = False
 
         logger.success("[{}] Connected", self)
 
     def close(self) -> None:
-        if self._closed:
-            return
+        if self.__closed:
+            raise RuntimeError("Registry is already closed")
 
-        self._closed = True
+        self.__closed = True
 
         for con in self._connections:
             with suppress(Exception):
