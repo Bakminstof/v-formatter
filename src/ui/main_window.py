@@ -15,7 +15,7 @@ from core.database import Registry, VideoRegistry
 from core.meta import VideoMetaProcessor
 from core.mixins import MetadataMixin
 from core.models import AppInfoModel
-from core.tasks import Runnable
+from core.threads import Runnable
 from ui.i18n import I18n, get_windows_ui_language
 from ui.models import Lang
 from ui.widgets.concat_widget import ConcatManager

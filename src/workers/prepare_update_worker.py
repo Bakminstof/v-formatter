@@ -1,12 +1,10 @@
-from pathlib import Path
-
 from PySide6.QtCore import QThread, Signal
 
 from updates.git_updater import GitUpdater
 
 
 class PrepareUpdateWorker(QThread):
-    finished = Signal(Path)
+    finished = Signal()
     error = Signal(str)
 
     def __init__(
@@ -22,7 +20,8 @@ class PrepareUpdateWorker(QThread):
 
     def run(self) -> None:
         try:
-            entrypoint = self.git_updater.prepare_update()
-            self.finished.emit(entrypoint)
+            self.git_updater.prepare_update()
+            self.git_updater.cleanup()
+            self.finished.emit()
         except Exception as e:
             self.error.emit(str(e))

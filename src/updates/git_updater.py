@@ -40,7 +40,7 @@ class GitUpdater:
 
         try:
             self.repo = git.Repo(repo_path, search_parent_directories=False)
-            logger.info("Git-репозиторий обнаружен: {}", repo_path)
+            logger.debug("Git-репозиторий обнаружен: {}", repo_path)
 
             self.convert_origin_to_https()
 
@@ -130,17 +130,17 @@ class GitUpdater:
         start = time.monotonic()
 
         try:
-            # ManagedProcess(
-            #     f"{self}|Clean",
-            #     [self.repo.git.GIT_PYTHON_GIT_EXECUTABLE, "clean", "-fd"],
-            #     error_flags=(),
-            # ).run()
-            #
-            # ManagedProcess(
-            #     f"{self}|Reset",
-            #     [self.repo.git.GIT_PYTHON_GIT_EXECUTABLE, "reset", "--hard"],
-            #     error_flags=(),
-            # ).run()
+            ManagedProcess(
+                f"{self}|Clean",
+                [self.repo.git.GIT_PYTHON_GIT_EXECUTABLE, "clean", "-fd"],
+                error_flags=(),
+            ).run()
+
+            ManagedProcess(
+                f"{self}|Reset",
+                [self.repo.git.GIT_PYTHON_GIT_EXECUTABLE, "reset", "--hard"],
+                error_flags=(),
+            ).run()
 
             elapsed = time.monotonic() - start
 
@@ -156,7 +156,7 @@ class GitUpdater:
             return False
 
     def fetch(self) -> bool:
-        logger.info("[{}] Fetching updates", self)
+        logger.debug("[{}] Fetching updates", self)
 
         start = time.monotonic()
 
@@ -174,7 +174,7 @@ class GitUpdater:
                 error_flags=(),
             ).run()
 
-            logger.info("[{}|LFS Fetch] Starting fetch", self)
+            logger.debug("[{}|LFS Fetch] Starting fetch", self)
 
             ManagedProcess(
                 f"{self}|LFS Fetch",
@@ -182,11 +182,11 @@ class GitUpdater:
                 error_flags=(),
             ).run()
 
-            logger.info("[{}|LFS Fetch] Done!", self)
+            logger.debug("[{}|LFS Fetch] Done!", self)
 
             elapsed = time.monotonic() - start
 
-            logger.success(
+            logger.debug(
                 "[{}] Fetch updates done at {}",
                 self,
                 humanize.precisedelta(elapsed),
@@ -222,14 +222,13 @@ class GitUpdater:
 
         elapsed = time.monotonic() - start
 
-        logger.info(
+        logger.debug(
             "[{}] Prepare update done at {}",
             self,
             humanize.precisedelta(elapsed),
         )
 
         self.fetch()
-        self.cleanup()
 
         self._prepared = True
 

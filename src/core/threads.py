@@ -4,6 +4,7 @@ from typing import Callable
 
 import humanize
 from loguru import logger
+from PySide6.QtCore import QRunnable, Slot
 
 DEFAULT_MAX_WORKERS = 16
 
@@ -63,3 +64,15 @@ def run_in_thread_pool(
         title,
         humanize.precisedelta(elapsed),
     )
+
+
+class Runnable(QRunnable):
+    def __init__(self, func: Callable, *args, **kwargs) -> None:
+        super().__init__()
+        self.func = func
+        self.args = args
+        self.kwargs = kwargs
+
+    @Slot()
+    def run(self):
+        self.func(*self.args, **self.kwargs)
