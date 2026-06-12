@@ -134,12 +134,14 @@ class GitUpdater:
                 f"{self}|Clean",
                 [self.repo.git.GIT_PYTHON_GIT_EXECUTABLE, "clean", "-fd"],
                 error_flags=(),
+                output_log_level="DEBUG",
             ).run()
 
             ManagedProcess(
                 f"{self}|Reset",
                 [self.repo.git.GIT_PYTHON_GIT_EXECUTABLE, "reset", "--hard"],
                 error_flags=(),
+                output_log_level="DEBUG",
             ).run()
 
             elapsed = time.monotonic() - start
@@ -172,6 +174,7 @@ class GitUpdater:
                     "--progress",
                 ],
                 error_flags=(),
+                output_log_level="DEBUG",
             ).run()
 
             logger.debug("[{}|LFS Fetch] Starting fetch", self)
@@ -180,6 +183,7 @@ class GitUpdater:
                 f"{self}|LFS Fetch",
                 [self.repo.git.GIT_PYTHON_GIT_EXECUTABLE, "lfs", "fetch"],
                 error_flags=(),
+                output_log_level="DEBUG",
             ).run()
 
             logger.debug("[{}|LFS Fetch] Done!", self)
