@@ -24,6 +24,7 @@ from ui.widgets.format_selector_widget import FormatSelectorManager
 from ui.widgets.log_widget import LogManager
 from ui.widgets.progress_bar_widget import ProgressBarManager
 from ui.widgets.queue_list_widget import QueueListManager
+from ui.widgets.repo_origin_widget import RepoOriginManager
 from ui.widgets.time_interval_widget import TimeIntervalManager
 from ui.widgets.version_widget import VersionManager
 from updates.git_updater import GitUpdater
@@ -32,7 +33,8 @@ from updates.git_updater import GitUpdater
 class MainWindow(QMainWindow, MetadataMixin):
     def __init__(
         self,
-        icon_path: Path,
+        main_icon_path: Path,
+        origin_icon_path: Path,
         i18n: I18n,
         app_info: AppInfoModel,
         git_updater: GitUpdater,
@@ -44,11 +46,11 @@ class MainWindow(QMainWindow, MetadataMixin):
         super().__init__(inited_registry=registry, parent=None)
 
         self._app_info = app_info
-        self.icon_path = icon_path
+        self.main_icon_path = main_icon_path
 
         self.i18n = i18n
 
-        # --- Initialize Managers ---
+        # --- Initialize Widget Managers ---
         self.input_dir_widget_manager = DirSelectorManger(
             self.get_metadata_cache,
             "input_dir",
@@ -90,7 +92,6 @@ class MainWindow(QMainWindow, MetadataMixin):
             self.get_metadata_cache,
             self.i18n.t("format"),
         )
-
         self.version_manager = VersionManager(
             self,
             git_updater,
@@ -99,6 +100,7 @@ class MainWindow(QMainWindow, MetadataMixin):
             self.i18n.t("update_do"),
             self.i18n.t("app_all_versions"),
         )
+        self.repo_origin_manager = RepoOriginManager(self._app_info, i18n, origin_icon_path)
 
         # Tasks
         self.task_scheduler = TaskManager()
@@ -110,14 +112,15 @@ class MainWindow(QMainWindow, MetadataMixin):
         self.resize(1000, 650)
         self.setMinimumSize(900, 550)
 
-        self.setWindowIcon(QIcon(self.icon_path.absolute().as_posix()))
+        self.setWindowIcon(QIcon(self.main_icon_path.absolute().as_posix()))
         self.setWindowTitle(self._app_info.name)
 
         layout = QVBoxLayout()
 
         top_layout = QHBoxLayout()
-        top_layout.addStretch(1)
         top_layout.addWidget(self.version_manager.widget)
+        top_layout.addStretch(1)
+        top_layout.addWidget(self.repo_origin_manager.widget)
         layout.addLayout(top_layout)
 
         # Directory selectors

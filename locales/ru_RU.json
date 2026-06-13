@@ -15,6 +15,12 @@
   "update_do": "Обновить",
   "app_current_version": "Текущая версия",
   "app_all_versions": "Доступные версии",
+  "origin": {
+    "repo": "GitHub",
+    "repo_tooltip": "Открыть страницу репозитория",
+    "feedback": "Обратная связь",
+    "feedback_tooltip": "Сообщить об ошибке или предложить улучшение"
+  },
   "version": {
     "log": {
       "update_not_found": "Не удалось определить последнюю версию.",

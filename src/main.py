@@ -61,8 +61,8 @@ def main() -> None:
     )
     updater = GitUpdater(
         repo_path=REPOSITORY_ROOT,
-        github_owner="Bakminstof",
-        github_repo="v-formatter",
+        github_owner=settings.origin.owner,
+        github_repo=settings.origin.repo,
         portable_git_base_dir=settings.tools.portable_git_base_dir,
         updater_tmp_dir=settings.updates.updater_tmp_dir,
         tools_tmp_dir=settings.updates.tools_tmp_dir,
@@ -75,7 +75,8 @@ def main() -> None:
     app = QApplication(argv)
 
     window = MainWindow(
-        settings.ui.icon_path,
+        settings.media.icons.main_icon_path,
+        settings.media.icons.origin_icon_path,
         i18n,
         settings.app_info,
         updater,

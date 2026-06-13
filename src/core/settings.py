@@ -22,6 +22,8 @@ TMP_DIR.mkdir(exist_ok=True, parents=True)
 
 DB_DIR = BASE_DIR.parent / "db"
 
+GITHUB_BASE_URL = "https://github.com"
+
 
 class LoggingSettings(BaseModel):
     model_config = ConfigDict(validate_default=True)
@@ -71,10 +73,6 @@ class I18nSettings(BaseModel):
     default_locale: Lang = Lang.ru_RU
 
 
-class UISettings(BaseModel):
-    icon_path: Path = MEDIA_DATA_DIR / "icon.png"
-
-
 class UpdatesSettings(BaseModel):
     fetch_interval_s: int = 600
 
@@ -85,6 +83,37 @@ class UpdatesSettings(BaseModel):
 
 class ToolsSettings(BaseModel):
     portable_git_base_dir: Path = TOOLS_DIR / "PortableGit"
+
+
+class OriginSettings(BaseModel):
+    @computed_field
+    @cached_property
+    def owner(self) -> str:
+        return "Bakminstof"
+
+    @computed_field
+    @cached_property
+    def repo(self) -> str:
+        return "v-formatter"
+
+    @computed_field
+    @cached_property
+    def feedback_url(self) -> str:
+        return f"{GITHUB_BASE_URL}/{self.owner}/{self.repo}/issues/new/choose"
+
+    @computed_field
+    @cached_property
+    def url(self) -> str:
+        return f"{GITHUB_BASE_URL}/{self.owner}/{self.repo}"
+
+
+class IconsSettings(BaseModel):
+    main_icon_path: Path = MEDIA_DATA_DIR / "icons" / "icon.png"
+    origin_icon_path: Path = MEDIA_DATA_DIR / "icons" / "github.png"
+
+
+class MediaSettings(BaseModel):
+    icons: IconsSettings = IconsSettings()
 
 
 class Settings(BaseSettings):
@@ -98,11 +127,6 @@ class Settings(BaseSettings):
     )
 
     # ======================================|Main|====================================== #
-    @computed_field
-    @cached_property
-    def app_info(self) -> AppInfoModel:
-        return AppInfoModel(name=APP_NAME)
-
     default_encoding: str = DEFAULT_ENCODING
 
     source_list_filename: str = "list.txt"
@@ -113,10 +137,20 @@ class Settings(BaseSettings):
 
     logging: LoggingSettings = LoggingSettings()
     i18n: I18nSettings = I18nSettings()
-    ui: UISettings = UISettings()
     db: DBSettings = DBSettings()
     tools: ToolsSettings = ToolsSettings()
     updates: UpdatesSettings = UpdatesSettings()
+    origin: OriginSettings = OriginSettings()
+    media: MediaSettings = MediaSettings()
+
+    @computed_field
+    @cached_property
+    def app_info(self) -> AppInfoModel:
+        return AppInfoModel(
+            name=APP_NAME,
+            orign_url=self.origin.url,
+            feedback_url=self.origin.feedback_url,
+        )
 
 
 settings = Settings()

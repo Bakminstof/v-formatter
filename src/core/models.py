@@ -17,6 +17,8 @@ class ArgsModel(BaseModel):
 
 class AppInfoModel(BaseModel):
     name: str
+    orign_url: str
+    feedback_url: str
 
 
 class VideoMetaModel(BaseModel):
