@@ -10,12 +10,12 @@ from core.concatenator import VideoConcatenator, VideosStructureModel
 from core.database import VideoRegistry
 from core.meta import VideoMetaProcessor
 from core.models import MetadataModel
+from threads.workers.directory_worker import DirectoryWorker
 from ui.models import ConcatStatus
 from ui.widgets.elapsed_time_widget import ElapsedTimeManger
 from ui.widgets.progress_bar_widget import ProgressBarManager
 from ui.widgets.queue_list_widget import QueueListManager
 from ui.widgets.time_interval_widget import TimeIntervalManager
-from workers.directory_worker import DirectoryWorker
 
 
 class ConcatManager:

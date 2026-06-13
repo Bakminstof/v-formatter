@@ -6,6 +6,8 @@ import humanize
 from loguru import logger
 from PySide6.QtCore import QRunnable, Slot
 
+from threads.workers.task_worker import TaskWorker
+
 DEFAULT_MAX_WORKERS = 16
 
 type CallbackSingle = Callable
@@ -64,6 +66,34 @@ def run_in_thread_pool(
         title,
         humanize.precisedelta(elapsed),
     )
+
+
+class TaskManager:
+    def __init__(self) -> None:
+        self._tasks: list[TaskWorker] = []
+
+    def add_task(
+        self,
+        callback: Callable[..., None],
+        interval_s: int = 0,
+        *callback_args,
+        **callback_kwargs,
+    ) -> TaskWorker:
+        worker = TaskWorker(
+            callback,
+            interval_s,
+            *callback_args,
+            **callback_kwargs,
+        )
+
+        self._tasks.append(worker)
+        worker.start()
+
+        return worker
+
+    def stop_all(self) -> None:
+        for worker in self._tasks:
+            worker.stop()
 
 
 class Runnable(QRunnable):

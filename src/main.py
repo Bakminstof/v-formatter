@@ -23,6 +23,7 @@ from core.database import MetadataRegistry, Registry, VideoRegistry
 from core.meta import VideoMetaProcessor
 from core.settings import settings
 from core.utils import parse_args, startup
+from ui.i18n import I18n, get_windows_ui_language
 from ui.main_window import MainWindow
 from updates.git_updater import GitUpdater
 
@@ -66,19 +67,22 @@ def main() -> None:
         updater_tmp_dir=settings.updates.updater_tmp_dir,
         tools_tmp_dir=settings.updates.tools_tmp_dir,
     )
+    i18n = I18n(
+        get_windows_ui_language(settings.i18n.default_locale),
+        settings.i18n.locales_dir,
+    )
 
     app = QApplication(argv)
 
     window = MainWindow(
         settings.ui.icon_path,
-        settings.i18n.default_locale,
-        settings.i18n.locales_dir,
+        i18n,
+        settings.app_info,
+        updater,
+        video_concatenator,
+        meta_processor,
+        registry,
         log_level="DEBUG" if args.verbose else "INFO",
-        app_info=settings.app_info,
-        video_concatenator=video_concatenator,
-        meta_processor=meta_processor,
-        registry=registry,
-        git_updater=updater,
     )
     window.show()
 

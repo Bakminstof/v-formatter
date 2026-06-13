@@ -12,10 +12,10 @@ from PySide6.QtWidgets import (
 )
 
 from core.models import UNKNOWN_VERSION, VersionsInfoModel
+from threads.workers.prepare_update_worker import PrepareUpdateWorker
 from ui.i18n import I18n
 from ui.models import VersionStatus
 from updates.git_updater import GitUpdater
-from workers.prepare_update_worker import PrepareUpdateWorker
 
 
 class VersionWidget(QWidget):
@@ -200,10 +200,7 @@ class VersionManager:
         self._progress_dialog.canceled.connect(self._cancel_update_preparation)
         self._progress_dialog.show()
 
-        self._prepare_worker = PrepareUpdateWorker(
-            self.__git_updater,
-            version_tag,
-        )
+        self._prepare_worker = PrepareUpdateWorker(self.__git_updater, version_tag)
         self._prepare_worker.finished.connect(self._on_update_prepared)
         self._prepare_worker.error.connect(self._on_update_prepare_error)
 

@@ -15,9 +15,8 @@ from core.database import Registry, VideoRegistry
 from core.meta import VideoMetaProcessor
 from core.mixins import MetadataMixin
 from core.models import AppInfoModel
-from core.threads import Runnable
-from ui.i18n import I18n, get_windows_ui_language
-from ui.models import Lang
+from threads.manage import Runnable, TaskManager
+from ui.i18n import I18n
 from ui.widgets.concat_widget import ConcatManager
 from ui.widgets.dir_selector_widget import DirSelectorManger
 from ui.widgets.elapsed_time_widget import ElapsedTimeManger
@@ -34,28 +33,20 @@ class MainWindow(QMainWindow, MetadataMixin):
     def __init__(
         self,
         icon_path: Path,
-        default_locale: Lang,
-        locales_dir: Path,
-        *,
-        log_level: str = "INFO",
+        i18n: I18n,
         app_info: AppInfoModel,
         git_updater: GitUpdater,
         video_concatenator: VideoConcatenator,
         meta_processor: VideoMetaProcessor,
         registry: Registry,
+        log_level: str = "INFO",
     ) -> None:
         super().__init__(inited_registry=registry, parent=None)
 
         self._app_info = app_info
-
-        # --- Window config ---
         self.icon_path = icon_path
 
-        # i18n
-        self.i18n = I18n(
-            get_windows_ui_language(default_locale),
-            locales_dir,
-        )
+        self.i18n = i18n
 
         # --- Initialize Managers ---
         self.input_dir_widget_manager = DirSelectorManger(
@@ -108,6 +99,9 @@ class MainWindow(QMainWindow, MetadataMixin):
             self.i18n.t("update_do"),
             self.i18n.t("app_all_versions"),
         )
+
+        # Tasks
+        self.task_scheduler = TaskManager()
 
         self.__build_layout()
         self.__on_startup()
@@ -181,6 +175,11 @@ class MainWindow(QMainWindow, MetadataMixin):
         for t in tasks:
             global_pool.start(t)
 
+        self.task_scheduler.add_task(
+            self.save_metadata,
+        )
+
     def closeEvent(self, event: QCloseEvent) -> None:
         self.save_metadata()
+        self.task_scheduler.stop_all()
         super().closeEvent(event)

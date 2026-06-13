@@ -6,7 +6,7 @@ from typing import Iterable
 from core.database import VideoRegistry
 from core.models import VideoMetaModel
 from core.process import ManagedProcess
-from core.threads import run_in_thread_pool
+from threads.manage import run_in_thread_pool
 
 
 class VideoMetaProcessor:
