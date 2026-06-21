@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 from contextlib import suppress
 from pathlib import Path
 from sqlite3 import Connection, connect
 from threading import Lock
 from threading import local as threading_local
+from typing import Set, Type
 
 from loguru import logger
 
@@ -35,11 +38,11 @@ class Registry:
     __initialized = False
     __closed = False
 
-    def __init__(self, db_path: Path, *tables: type[TableRegistry]) -> None:
+    def __init__(self, db_path: Path, *tables: Type[TableRegistry]) -> None:
         self._db_path = db_path
         self._db_path_str = self._db_path.absolute().as_posix()
         self._local = threading_local()
-        self._connections: set[Connection] = set()
+        self._connections: Set[Connection] = set()
         self.__tables = tables
 
     def __str__(self) -> str:

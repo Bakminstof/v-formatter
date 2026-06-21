@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from enum import StrEnum
+from enum import Enum
 
 
-class Lang(StrEnum):
+class Lang(Enum):
     ru_RU = "ru_RU"
 
 
-class ConcatStatus(StrEnum):
+class ConcatStatus(Enum):
     waiting = "⏳"
     processing = "⚙️"
     done = "✅"
@@ -15,7 +15,7 @@ class ConcatStatus(StrEnum):
     unknown = "❓"
 
 
-class VersionStatus(StrEnum):
+class VersionStatus(Enum):
     actual = "✅"
     cant_check = "⦿"
     need_update = "⬆️"

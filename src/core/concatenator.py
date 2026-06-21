@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pathlib import Path
 from re import compile as re_compile
 
@@ -6,18 +8,14 @@ from pydantic import BaseModel
 
 from core.process import ManagedProcess
 
-type SourcePath = Path
-type Index = int
-type DestinationPath = Path
-
 
 class VideoDestinationInfoModel(BaseModel):
-    destination: DestinationPath
-    files: dict[Index, Path] = {}
+    destination: Path
+    files: dict = {}
 
 
 class VideosStructureModel(BaseModel):
-    data: dict[SourcePath, VideoDestinationInfoModel] = {}
+    data: dict = {}
 
 
 class VideoConcatenator:

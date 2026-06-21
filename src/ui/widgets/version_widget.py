@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from loguru import logger
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
@@ -73,13 +75,13 @@ class VersionWidget(QWidget):
         all_versions = model.all
 
         if current == latest:
-            status = VersionStatus.actual
+            status = VersionStatus.actual.value
             update_btn_visible = False
         elif latest == UNKNOWN_VERSION:
-            status = VersionStatus.cant_check
+            status = VersionStatus.cant_check.value
             update_btn_visible = False
         else:
-            status = VersionStatus.need_update
+            status = VersionStatus.need_update.value
             update_btn_visible = True
 
         self.version_label.setText(f"{self.label} {current} {status}")

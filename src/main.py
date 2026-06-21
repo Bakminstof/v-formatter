@@ -68,7 +68,7 @@ def main() -> None:
         tools_tmp_dir=settings.updates.tools_tmp_dir,
     )
     i18n = I18n(
-        get_windows_ui_language(settings.i18n.default_locale),
+        get_windows_ui_language(settings.i18n.default_locale).value,
         settings.i18n.locales_dir,
     )
 

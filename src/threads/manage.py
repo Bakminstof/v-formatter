@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import time
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
-from typing import Callable
+from typing import Callable, List
 
 import humanize
 from loguru import logger
@@ -10,16 +12,9 @@ from threads.workers.task_worker import TaskWorker
 
 DEFAULT_MAX_WORKERS = 16
 
-type CallbackSingle = Callable
-type CallbackWithArgsAndKwargs = tuple[Callable, tuple, dict] | tuple[Callable, dict, tuple]
-type CallbackWithArgs = tuple[Callable, tuple]
-type CallbackWithKwargs = tuple[Callable, dict]
-
-type ExecutableType = CallbackSingle | CallbackWithArgsAndKwargs | CallbackWithArgs | CallbackWithKwargs
-
 
 def run_in_thread_pool(
-    items: list[ExecutableType] | tuple[ExecutableType, ...],
+    items: list | tuple,
     *,
     max_workers: int = DEFAULT_MAX_WORKERS,
 ) -> None:
@@ -29,7 +24,7 @@ def run_in_thread_pool(
     start = time.monotonic()
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures: list[Future[None]] = []
+        futures: List[Future[None]] = []
 
         for item in items:
             if isinstance(item, tuple):

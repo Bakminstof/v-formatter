@@ -1,6 +1,7 @@
 from functools import cached_property
 from pathlib import Path
 from tempfile import gettempdir
+from typing import Set
 
 from pydantic import BaseModel, ConfigDict, computed_field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -70,7 +71,7 @@ class DBSettings(BaseModel):
 class I18nSettings(BaseModel):
     locales_dir: Path = BASE_DIR.parent / "locales"
 
-    default_locale: Lang = Lang.ru_RU
+    default_locale: Lang = Lang.ru_RU.value
 
 
 class UpdatesSettings(BaseModel):
@@ -130,7 +131,7 @@ class Settings(BaseSettings):
     default_encoding: str = DEFAULT_ENCODING
 
     source_list_filename: str = "list.txt"
-    ignore: set[str] = {".gitkeep"}
+    ignore: Set[str] = {".gitkeep"}
 
     ffmpeg: Path = BINARIES_DIR / "ffmpeg.exe"
     ffprobe: Path = BINARIES_DIR / "ffprobe.exe"

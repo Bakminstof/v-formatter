@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pathlib import Path
 from typing import Callable
 
@@ -12,7 +14,7 @@ class DirSelectorWidget(QWidget):
         placeholder_text: str,
         select_folder_label: str,
         on_change_callback: Callable[[Path], None] | None = None,
-        push_btn_label: str = Emojis.dir,
+        push_btn_label: str = Emojis.dir.value,
     ) -> None:
         super().__init__()
 
@@ -65,7 +67,7 @@ class DirSelectorManger:
         metadata_cache_key: str,
         placeholder_text: str,
         select_folder_label: str,
-        push_btn_label: str = Emojis.dir,
+        push_btn_label: str = Emojis.dir.value,
     ) -> None:
         self.metadata_cache_key = metadata_cache_key
         self.__metadata_cache = metadata_cache_getter

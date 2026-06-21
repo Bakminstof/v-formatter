@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 from datetime import datetime, timedelta
 from pathlib import Path
 from subprocess import CREATE_NO_WINDOW, PIPE, STDOUT, Popen
 from sys import platform
 from threading import Lock
-from typing import Iterable, Mapping
+from typing import Iterable, List, Mapping
 
 from loguru import logger
 from pydantic import BaseModel
@@ -13,8 +15,8 @@ DEFAULT_ERROR_FLAGS = frozenset(("error", "fail", "crash", "exception"))
 
 class ProcessResultModel(BaseModel):
     exit_code: int
-    stdout: list[str] = []
-    error_lines: list[str] = []
+    stdout: List[str] = []
+    error_lines: List[str] = []
 
 
 def is_error_line(line: str, error_flags: Iterable[str]) -> bool:

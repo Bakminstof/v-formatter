@@ -4,7 +4,7 @@ from core.models import MetadataModel
 
 class MetadataMixin:
     def __init__(self, inited_registry: Registry, **kwargs) -> None:
-        super().__init__(**kwargs)
+        # super().__init__(**kwargs)
 
         self.metadata_registry: MetadataRegistry = getattr(
             inited_registry,

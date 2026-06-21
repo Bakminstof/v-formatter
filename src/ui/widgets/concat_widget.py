@@ -100,7 +100,7 @@ class ConcatManager:
         self.progress_bar_manager.widget.setValue(0)
 
         for inp_path in self.videos_structure.data.keys():
-            self.add_directory_status(inp_path.name, ConcatStatus.waiting)
+            self.add_directory_status(inp_path.name, ConcatStatus.waiting.value)
 
         self.__total_tasks = len(self.videos_structure.data)
         self.__current_task_index = 0
@@ -144,7 +144,7 @@ class ConcatManager:
         self.progress_bar_manager.widget.setValue(percent)
 
     def _on_task_finished(self, success: bool) -> None:
-        status = ConcatStatus.done if success else ConcatStatus.error
+        status = ConcatStatus.done.value if success else ConcatStatus.error.value
         self.update_directory_status(self.__current_task_index, status)
 
         self.__current_task_index += 1
@@ -192,7 +192,7 @@ class ConcatManager:
     def add_directory_status(
         self,
         directory: str,
-        status: str = ConcatStatus.waiting,
+        status: str = ConcatStatus.waiting.value,
     ) -> None:
         self.queue_manager.widget.addItem(f"{status} {directory}")
 

@@ -15,7 +15,7 @@ def get_windows_ui_language(default: Lang) -> Lang:
     lang_id = kernel32.GetUserDefaultUILanguage()
     lang = locale.windows_locale.get(lang_id)
 
-    if lang not in Lang:
+    if lang not in Lang._member_names_:
         return default
 
     return Lang(lang)

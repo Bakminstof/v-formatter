@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 from argparse import ArgumentParser
 from datetime import datetime, timezone
-from zoneinfo import ZoneInfo
 
 import humanize
 
@@ -12,6 +13,8 @@ from ui.models import Lang
 
 def local_to_utc_time(local_time_str: str) -> str:
     try:
+        from zoneinfo import ZoneInfo
+
         local_tz = ZoneInfo("localtime")
     except Exception:
         now = datetime.now()
@@ -49,7 +52,7 @@ def startup(
     verbose: bool = False,
     log_file: str | None = None,
 ) -> None:
-    humanize.i18n.activate(get_windows_ui_language(default_locale))
+    humanize.i18n.activate(get_windows_ui_language(default_locale).value)
 
     setup_logging(
         rotation,

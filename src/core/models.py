@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from enum import StrEnum
+from enum import Enum
 from pathlib import Path
 from re import match
 from sqlite3 import Row
-from typing import Self
+from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
@@ -28,11 +28,11 @@ class VideoMetaModel(BaseModel):
     start_datetime: datetime
     end_datetime: datetime
     duration: float
-    error: str | None = None
+    error: Optional[str] = None
     processed_at: datetime = datetime.now()
 
     @classmethod
-    def from_row(cls, data: Row) -> Self:
+    def from_row(cls, data: Row) -> "VideoMetaModel":
         return cls.model_validate(
             {
                 "file_path": data[1],
@@ -53,10 +53,10 @@ UNKNOWN_VERSION = "unknown"
 class VersionsInfoModel(BaseModel):
     current: str = UNKNOWN_VERSION
     latest: str = UNKNOWN_VERSION
-    all: list[str] = []
+    all: list = []
 
 
-class Emojis(StrEnum):
+class Emojis(Enum):
     dir = "📁"
 
 
@@ -88,8 +88,8 @@ class FiltersModel(BaseModel):
 
 
 class MetadataModel(BaseModel):
-    input_dir: Path | None = None
-    output_dir: Path | None = None
+    input_dir: Optional[Path] = None
+    output_dir: Optional[Path] = None
     video_format: str = "3gp"
 
     filters: FiltersModel = FiltersModel()
