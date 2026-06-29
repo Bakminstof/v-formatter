@@ -74,7 +74,7 @@ class VideoMetaProcessor:
 
         tags = data["format"]["tags"]
         duration = float(data["format"]["duration"])
-        start_datetime = datetime.fromisoformat(tags["creation_time"])
+        start_datetime = datetime.fromisoformat(tags["creation_time"].replace("Z", "+00:00"))
 
         return VideoMetaModel(
             file_path=video_path,
