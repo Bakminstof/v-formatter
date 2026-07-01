@@ -1,13 +1,57 @@
 from argparse import ArgumentParser
 from datetime import datetime, timezone
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import humanize
 
 from core.logs import setup_logging
-from core.models import ArgsModel
+from core.models import ArgsModel, VideoFormat
+from core.process import ManagedProcess
 from ui.i18n import get_windows_ui_language
 from ui.models import Lang
+
+
+def get_supported_formats(ffmpeg: Path) -> list[VideoFormat]:
+    res = ManagedProcess(
+        f"FFMpeg",
+        [ffmpeg, "-formats"],
+        error_flags=(),
+        output_log_level="DEBUG",
+        capture_output=True,
+    ).run()
+
+    formats_list = []
+
+    start_parsing = False
+
+    for line in res.stdout:
+        if "---" in line:
+            start_parsing = True
+            continue
+
+        if not start_parsing or not line.strip():
+            continue
+
+        flags = set(line.strip().split(maxsplit=1)[0])
+
+        content = line[4:].strip().split(maxsplit=1)
+
+        if content:
+            fmt_name = content[0]
+            description = content[1] if len(content) > 1 else ""
+
+            formats_list.append(
+                VideoFormat(
+                    extension=fmt_name,
+                    description=description,
+                    demuxing="D" in flags,
+                    muxing="E" in flags,
+                    device="d" in flags,
+                )
+            )
+
+    return formats_list
 
 
 def local_to_utc_time(local_time_str: str) -> str:

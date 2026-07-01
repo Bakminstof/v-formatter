@@ -19,7 +19,7 @@ from loguru import logger
 from PySide6.QtWidgets import QApplication
 
 from core.concatenator import VideoConcatenator
-from core.database import MetadataRegistry, Registry, VideoRegistry
+from core.database import FormatRegistry, MetadataRegistry, Registry, VideoRegistry
 from core.meta import VideoMetaProcessor
 from core.settings import settings
 from core.utils import parse_args, startup
@@ -43,7 +43,12 @@ def main() -> None:
         log_file=settings.logging.file_path,
     )
 
-    registry = Registry(settings.db.path, VideoRegistry, MetadataRegistry)
+    registry = Registry(
+        settings.db.path,
+        VideoRegistry,
+        MetadataRegistry,
+        FormatRegistry,
+    )
     registry.init()
 
     meta_processor = VideoMetaProcessor(
@@ -75,6 +80,7 @@ def main() -> None:
     app = QApplication(argv)
 
     window = MainWindow(
+        settings.ffmpeg,
         settings.media.icons.main_icon_path,
         settings.media.icons.origin_icon_path,
         i18n,

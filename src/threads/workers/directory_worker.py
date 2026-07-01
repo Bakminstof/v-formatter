@@ -16,7 +16,6 @@ class DirectoryWorker(QThread):
         self,
         input_dir: Path,
         structure: VideosStructureModel,
-        target_suffix: str,
         *,
         video_concatenator: VideoConcatenator,
         meta_processor: VideoMetaProcessor,
@@ -32,7 +31,6 @@ class DirectoryWorker(QThread):
 
         self.input_dir = input_dir
         self.structure = structure
-        self.target_suffix = target_suffix
 
         self._time_interval = (start_at, end_at) if start_at and end_at else None
 
@@ -74,7 +72,6 @@ class DirectoryWorker(QThread):
                 self.input_dir,
                 target_files,
                 self.structure.data[self.input_dir].destination,
-                self.target_suffix,
                 process=self._process,
             )
 

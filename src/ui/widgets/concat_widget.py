@@ -177,7 +177,6 @@ class ConcatManager:
         worker = DirectoryWorker(
             inp_path,
             self.videos_structure,
-            self.__metadata_cache().video_format,
             video_concatenator=self.video_concatenator,
             meta_processor=self.meta_processor,
             registry=self.video_registry,

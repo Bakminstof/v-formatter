@@ -6,7 +6,7 @@ from threading import local as threading_local
 
 from loguru import logger
 
-from core.models import MetadataModel, VideoMetaModel
+from core.models import MetadataModel, VideoFormat, VideoMetaModel
 from core.utils import local_to_utc_time
 
 
@@ -236,3 +236,141 @@ class MetadataRegistry(TableRegistry):
                 exc_info=e,
             )
             return MetadataModel()
+
+
+class FormatRegistry(TableRegistry):
+    __table_name__ = "formats"
+
+    def on_startup(self, con: Connection) -> None:
+        con.execute(
+            f"""
+                CREATE TABLE IF NOT EXISTS {self.__table_name__} (
+                    extension TEXT PRIMARY KEY,
+                    description TEXT NOT NULL,
+                    demuxing INTEGER NOT NULL DEFAULT 0,
+                    muxing INTEGER NOT NULL DEFAULT 0,
+                    device INTEGER NOT NULL DEFAULT 0
+                );
+            """
+        )
+        con.execute(
+            f"CREATE INDEX IF NOT EXISTS idx_formats_extension ON {self.__table_name__}(extension);"
+        )
+        logger.info("[{}] Initialized", self)
+
+    def add(
+        self,
+        extension: str,
+        description: str,
+        demuxing: bool,
+        muxing: bool,
+        device: bool,
+    ) -> None:
+        with self.write_lock:
+            self.con.execute(
+                f"""
+                INSERT INTO {self.__table_name__} (extension, description, demuxing, muxing, device)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(extension) DO UPDATE SET
+                    description = excluded.description,
+                    demuxing = excluded.demuxing,
+                    muxing = excluded.muxing,
+                    device = excluded.device
+                """,
+                (extension, description, int(demuxing), int(muxing), int(device)),
+            )
+            self.con.commit()
+        logger.info("[{}] Added/Updated format: {}", self, extension)
+
+    def add_batch(self, formats: list[VideoFormat]) -> None:
+        """Пакетное добавление/обновление форматов."""
+        with self.write_lock:
+            self.con.executemany(
+                f"""
+                INSERT INTO {self.__table_name__} (extension, description, demuxing, muxing, device)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(extension) DO UPDATE SET
+                    description = excluded.description,
+                    demuxing = excluded.demuxing,
+                    muxing = excluded.muxing,
+                    device = excluded.device
+                """,
+                [
+                    (
+                        fmt.extension,
+                        fmt.description,
+                        int(fmt.demuxing),
+                        int(fmt.muxing),
+                        int(fmt.device),
+                    )
+                    for fmt in formats
+                ],
+            )
+            self.con.commit()
+        logger.debug("[{}] Batch added/updated {} formats", self, len(formats))
+
+    def get_by_extension(self, extension: str) -> VideoFormat | None:
+        """Найти формат по расширению."""
+        res = self.con.execute(
+            f"SELECT extension,"
+            f" description,"
+            f" demuxing,"
+            f" muxing,"
+            f" device FROM {self.__table_name__} WHERE extension = ?",
+            (extension,),
+        )
+        row = res.fetchone()
+
+        if not row:
+            return None
+
+        return VideoFormat(
+            extension=row[0],
+            description=row[1],
+            demuxing=bool(row[2]),
+            muxing=bool(row[3]),
+            device=bool(row[4]),
+        )
+
+    def update(self, extension: str, **kwargs: str) -> None:
+        allowed_fields = {"description", "demuxing", "muxing", "device"}
+        if not kwargs or not set(kwargs.keys()).issubset(allowed_fields):
+            raise ValueError(f"Invalid fields: {set(kwargs.keys()) - allowed_fields}")
+
+        processed_kwargs = {}
+        for k, v in kwargs.items():
+            if k in {"demuxing", "muxing", "device"}:
+                processed_kwargs[k] = int(v)
+            else:
+                processed_kwargs[k] = v
+
+        set_clause = ", ".join(f"{field} = ?" for field in processed_kwargs)
+        values = list(processed_kwargs.values()) + [extension]
+
+        with self.write_lock:
+            self.con.execute(
+                f"UPDATE {self.__table_name__} SET {set_clause} WHERE extension = ?", values
+            )
+            self.con.commit()
+        logger.info("[{}] Updated format {} with {}", self, extension, kwargs)
+
+    def delete(self, extension: str) -> None:
+        with self.write_lock:
+            self.con.execute(f"DELETE FROM {self.__table_name__} WHERE extension = ?", (extension,))
+            self.con.commit()
+        logger.info("[{}] Deleted format: {}", self, extension)
+
+    def list_all(self) -> list[VideoFormat]:
+        res = self.con.execute(
+            f"SELECT extension, description, demuxing, muxing, device FROM {self.__table_name__}"
+        )
+        return [
+            VideoFormat(
+                extension=row[0],
+                description=row[1],
+                demuxing=bool(row[2]),
+                muxing=bool(row[3]),
+                device=bool(row[4]),
+            )
+            for row in res.fetchall()
+        ]

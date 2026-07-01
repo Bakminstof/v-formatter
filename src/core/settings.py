@@ -80,6 +80,8 @@ class UpdatesSettings(BaseModel):
 
     tools_tmp_dir: Path = TMP_DIR / "tools"
 
+    insecure: bool = False
+
 
 class ToolsSettings(BaseModel):
     portable_git_base_dir: Path = TOOLS_DIR / "PortableGit"
@@ -119,7 +121,7 @@ class MediaSettings(BaseModel):
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="app.",
-        env_file=(f"{BASE_DIR / '.env'}",),
+        env_file=(f"{BASE_DIR.parent / '.env'}",),
         case_sensitive=False,
         arbitrary_types_allowed=True,
         env_nested_delimiter="__",

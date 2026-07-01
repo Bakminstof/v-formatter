@@ -1,9 +1,16 @@
-from typing import Callable
+from typing import Callable, Iterable
 
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QSizePolicy, QWidget
+from PySide6.QtCore import QSortFilterProxyModel, Qt
+from PySide6.QtWidgets import (
+    QComboBox,
+    QCompleter,
+    QHBoxLayout,
+    QLabel,
+    QSizePolicy,
+    QWidget,
+)
 
-from core.models import VIDEO_FORMATS, MetadataModel, VideoFormat
+from core.models import MetadataModel, VideoFormat
 
 
 class FormatSelectorWidget(QWidget):
@@ -11,7 +18,6 @@ class FormatSelectorWidget(QWidget):
         self,
         label: str,
         on_change: Callable[[str], None] | None = None,
-        formats: tuple[VideoFormat, ...] = VIDEO_FORMATS,
     ) -> None:
         super().__init__()
 
@@ -19,17 +25,30 @@ class FormatSelectorWidget(QWidget):
 
         label_widget = QLabel(label)
         self.combo = QComboBox()
+        self.combo.setEditable(True)
+        self.combo.setInsertPolicy(QComboBox.NoInsert)
 
-        for fmt in formats:
-            self.combo.addItem(fmt.label, fmt.extension)
-
-        self.combo.setCurrentIndex(0)
         self.combo.setSizePolicy(
             QSizePolicy.Policy.Fixed,
             QSizePolicy.Policy.Fixed,
         )
-        self.combo.setMinimumWidth(140)
-        self.combo.setMaximumWidth(200)
+        self.combo.setMinimumWidth(180)
+        self.combo.setMaximumWidth(300)
+
+        self._proxy = QSortFilterProxyModel()
+        self._proxy.setSourceModel(self.combo.model())
+        self._proxy.setFilterCaseSensitivity(Qt.CaseInsensitive)
+        self._proxy.setFilterKeyColumn(0)
+
+        self._completer = QCompleter(self._proxy, self.combo)
+        self._completer.setCompletionMode(QCompleter.PopupCompletion)
+        self._completer.setFilterMode(Qt.MatchContains)
+        self._completer.setCaseSensitivity(Qt.CaseInsensitive)
+        self.combo.setCompleter(self._completer)
+
+        self.combo.lineEdit().textChanged.connect(self._on_text_changed)
+
+        self._completer.activated.connect(self._on_completer_activated)
 
         self.combo.currentIndexChanged.connect(self._emit_change)
 
@@ -39,13 +58,31 @@ class FormatSelectorWidget(QWidget):
         layout.addStretch(1)
         layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
         layout.setContentsMargins(0, 0, 0, 0)
-
         self.setLayout(layout)
 
+    def fill(self, formats: Iterable[VideoFormat]) -> None:
+        self.combo.clear()
+
+        for fmt in formats:
+            self.combo.addItem(
+                f"({fmt.extension}) -- {fmt.description}",
+                fmt.extension,
+            )
+
     def set_current_value(self, value: str) -> None:
+        self._proxy.setFilterFixedString("")
         index = self.combo.findData(value)
         if index >= 0:
             self.combo.setCurrentIndex(index)
+
+    def _on_text_changed(self, text: str) -> None:
+        self._proxy.setFilterFixedString(text)
+
+    def _on_completer_activated(self, text: str) -> None:
+        for i in range(self.combo.count()):
+            if self.combo.itemText(i) == text:
+                self.combo.setCurrentIndex(i)
+                return
 
     def _emit_change(self) -> None:
         if self._on_change:
@@ -61,11 +98,10 @@ class FormatSelectorManager:
         self,
         metadata_cache_getter: Callable[[], MetadataModel],
         label: str,
-        formats: tuple[VideoFormat, ...] = VIDEO_FORMATS,
     ) -> None:
         self.__metadata_cache = metadata_cache_getter
 
-        self.widget = FormatSelectorWidget(label, self.__on_change, formats)
+        self.widget = FormatSelectorWidget(label, self.__on_change)
 
     def startup(self) -> None:
         self.widget.set_current_value(self.__metadata_cache().video_format)

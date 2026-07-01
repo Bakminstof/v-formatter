@@ -51,7 +51,7 @@ class DirSelectorWidget(QWidget):
     def set_path(self, path: str | None) -> None:
         self.edit.setText(path)
 
-        if self.__on_change_callback and path:
+        if self.__on_change_callback and path not in {None, "", "None"}:
             self.__on_change_callback(Path(path))
 
     def get_path(self) -> str:

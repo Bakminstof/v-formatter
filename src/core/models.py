@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
@@ -60,12 +59,6 @@ class Emojis(StrEnum):
     dir = "📁"
 
 
-@dataclass(frozen=True)
-class VideoFormat:
-    label: str
-    extension: str
-
-
 class TimeFilterModel(BaseModel):
     model_config = ConfigDict(validate_default=True)
 
@@ -90,14 +83,18 @@ class FiltersModel(BaseModel):
 class MetadataModel(BaseModel):
     input_dir: Path | None = None
     output_dir: Path | None = None
-    video_format: str = "3gp"
+    video_format: str = "mov,mp4,m4a,3gp,3g2,mj2"
 
     filters: FiltersModel = FiltersModel()
 
 
-VIDEO_FORMATS: tuple[VideoFormat, ...] = (
-    VideoFormat("MP4 (H.264)", "mp4"),
-    VideoFormat("MKV", "mkv"),
-    VideoFormat("AVI", "avi"),
-    VideoFormat("3GP", "3gp"),
-)
+class VideoFormat(BaseModel):
+    extension: str
+    description: str
+
+    demuxing: bool = False
+    muxing: bool = False
+    device: bool = False
+
+    def __hash__(self) -> int:
+        return hash(self.extension)

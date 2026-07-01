@@ -11,10 +11,11 @@ from PySide6.QtWidgets import (
 )
 
 from core.concatenator import VideoConcatenator
-from core.database import Registry, VideoRegistry
+from core.database import FormatRegistry, Registry, VideoRegistry
 from core.meta import VideoMetaProcessor
 from core.mixins import MetadataMixin
 from core.models import AppInfoModel
+from core.utils import get_supported_formats
 from threads.manage import Runnable, TaskManager
 from ui.i18n import I18n
 from ui.widgets.concat_widget import ConcatManager
@@ -33,6 +34,7 @@ from updates.git_updater import GitUpdater
 class MainWindow(QMainWindow, MetadataMixin):
     def __init__(
         self,
+        ffmpeg: Path,
         main_icon_path: Path,
         origin_icon_path: Path,
         i18n: I18n,
@@ -44,6 +46,9 @@ class MainWindow(QMainWindow, MetadataMixin):
         log_level: str = "INFO",
     ) -> None:
         super().__init__(inited_registry=registry, parent=None)
+
+        self.registry = registry
+        self.ffmpeg = ffmpeg
 
         self._app_info = app_info
         self.main_icon_path = main_icon_path
@@ -161,17 +166,35 @@ class MainWindow(QMainWindow, MetadataMixin):
 
         self.input_dir_widget_manager.startup()
         self.output_dir_widget_manager.startup()
-        self.format_selector_manager.startup()
         self.time_interval_filter_manager.startup()
+
+        self.__update_supported_formats()
 
     def __update_version_info(self) -> None:
         self.version_manager.startup()
+
+    def __update_supported_formats(self) -> None:
+        format_registry: FormatRegistry = getattr(
+            self.registry,
+            FormatRegistry.__table_name__,
+        )
+
+        formats = format_registry.list_all()
+
+        if not formats:
+            formats = get_supported_formats(self.ffmpeg)
+
+        format_registry.add_batch(formats)
+
+        self.format_selector_manager.widget.fill(formats)
+        self.format_selector_manager.startup()
 
     def __on_startup(self) -> None:
         global_pool = QThreadPool.globalInstance()
         tasks = [
             Runnable(self.__update_metadata),
             Runnable(self.__update_version_info),
+            Runnable(self.__update_supported_formats),
             Runnable(self.version_manager.prepare_update),
         ]
 
@@ -180,6 +203,7 @@ class MainWindow(QMainWindow, MetadataMixin):
 
         self.task_scheduler.add_task(
             self.save_metadata,
+            30,
         )
 
     def closeEvent(self, event: QCloseEvent) -> None:

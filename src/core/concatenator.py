@@ -40,7 +40,8 @@ class VideoConcatenator:
         target_suffix: str,
     ) -> VideosStructureModel:
         videos_structure = VideosStructureModel()
-        index_pattern = re_compile(rf"^(\d+).*\.{target_suffix}")
+        target_suffix_parts = f"({"|".join(target_suffix.split(','))})"
+        index_pattern = re_compile(rf"^(\d+).*\.{target_suffix_parts}")
 
         for item in source.rglob("**/*"):
             if item.is_dir():
@@ -119,7 +120,6 @@ class VideoConcatenator:
         source: Path,
         source_files: dict[int, Path],
         destination: Path,
-        target_suffix: str,
         *,
         process: ManagedProcess | None = None,
     ) -> None:
@@ -128,6 +128,7 @@ class VideoConcatenator:
 
         sorted_indices = sorted(source_files.keys())
         sorted_files = [source_files[idx] for idx in sorted_indices]
+        target_suffix = sorted_files[0].suffixes[-1]
 
         list_file = self.make_source_list_file(source, sorted_files)
         self.concat_files(
@@ -143,7 +144,6 @@ class VideoConcatenator:
         source: Path,
         source_files: dict[int, Path],
         destination: Path,
-        target_suffix: str,
         *,
         process: ManagedProcess | None = None,
     ) -> None:
@@ -157,7 +157,6 @@ class VideoConcatenator:
                 source,
                 source_files,
                 destination,
-                target_suffix,
                 process=process,
             )
         except KeyboardInterrupt:
