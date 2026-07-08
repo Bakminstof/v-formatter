@@ -7,10 +7,11 @@ from core.concatenator import VideoConcatenator, VideosStructureModel
 from core.database import VideoRegistry
 from core.meta import VideoMetaProcessor
 from core.process import ManagedProcess
+from ui.models import ConcatStatus
 
 
 class DirectoryWorker(QThread):
-    finished = Signal(bool)
+    finished = Signal(str)
 
     def __init__(
         self,
@@ -68,15 +69,21 @@ class DirectoryWorker(QThread):
 
             target_files = self._get_target_files()
 
-            self.video_concatenator.run(
+            if not target_files:
+                self.finished.emit(ConcatStatus.not_found)
+                return
+
+            exit_code, result_file = self.video_concatenator.run(
                 self.input_dir,
                 target_files,
                 self.structure.data[self.input_dir].destination,
                 process=self._process,
             )
 
-            if not self._stop:
-                self.finished.emit(True)
+            if not self._stop and exit_code == 0:
+                self.finished.emit(ConcatStatus.done)
+            else:
+                self.finished.emit(ConcatStatus.error)
 
         except Exception as e:
             logger.exception(
@@ -85,7 +92,7 @@ class DirectoryWorker(QThread):
                 str(e),
                 exc_info=e,
             )
-            self.finished.emit(False)
+            self.finished.emit(ConcatStatus.error)
 
     def stop(self, kill: bool = False) -> None:
         self._stop = True

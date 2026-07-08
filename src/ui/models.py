@@ -10,6 +10,7 @@ class Lang(StrEnum):
 class ConcatStatus(StrEnum):
     waiting = "⏳"
     processing = "⚙️"
+    not_found = "⦿"
     done = "✅"
     error = "❌"
     unknown = "❓"

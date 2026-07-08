@@ -154,5 +154,10 @@ class Settings(BaseSettings):
             feedback_url=self.origin.feedback_url,
         )
 
+    @computed_field
+    @cached_property
+    def tmp_dir(self) -> Path:
+        return TMP_DIR
+
 
 settings = Settings()

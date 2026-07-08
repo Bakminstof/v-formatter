@@ -27,6 +27,7 @@ class DirSelectorWidget(QWidget):
         self.edit = QLineEdit()
         self.edit.setPlaceholderText(self.placeholder_text)
         self.edit.setText("")
+        self.edit.textEdited.connect(self.__on_text_edited)
 
         # Button
         self.btn = QPushButton(push_btn_label)
@@ -47,6 +48,12 @@ class DirSelectorWidget(QWidget):
 
         if path:
             self.set_path(path)
+
+    def __on_text_edited(self) -> None:
+        path = self.get_path()
+
+        if self.__on_change_callback:
+            self.__on_change_callback(Path(path))
 
     def set_path(self, path: str | None) -> None:
         self.edit.setText(path)

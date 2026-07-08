@@ -59,6 +59,7 @@ def main() -> None:
         ),
     )
     video_concatenator = VideoConcatenator(
+        settings.tmp_dir / "concat",
         settings.ffmpeg,
         settings.source_list_filename,
         settings.default_encoding,

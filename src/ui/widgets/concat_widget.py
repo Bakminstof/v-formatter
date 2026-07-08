@@ -88,6 +88,7 @@ class ConcatManager:
                 str(self.__metadata_cache().input_dir),
                 str(self.__metadata_cache().output_dir),
             )
+            self.__concat_started = False
             return
 
         self.videos_structure = self.video_concatenator.collect_data_dirs(
@@ -143,8 +144,7 @@ class ConcatManager:
         )
         self.progress_bar_manager.widget.setValue(percent)
 
-    def _on_task_finished(self, success: bool) -> None:
-        status = ConcatStatus.done if success else ConcatStatus.error
+    def _on_task_finished(self, status: ConcatStatus) -> None:
         self.update_directory_status(self.__current_task_index, status)
 
         self.__current_task_index += 1

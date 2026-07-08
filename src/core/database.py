@@ -141,7 +141,6 @@ class VideoRegistry(TableRegistry):
         start_time: str,
         end_time: str,
     ) -> list[VideoMetaModel]:
-        folder_escaped = folder.as_posix().replace("%", "\\%").replace("_", "\\_")
         res = self.con.execute(
             f"""
             SELECT * FROM {self.__table_name__}
@@ -151,7 +150,7 @@ class VideoRegistry(TableRegistry):
             ORDER BY start_datetime
             """,
             (
-                folder_escaped + "/%",
+                folder.absolute().as_posix() + "/%",
                 local_to_utc_time(end_time),
                 local_to_utc_time(start_time),
             ),
