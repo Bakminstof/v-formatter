@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from core.models import MetadataModel
+from core.context import AppContext
 
 
 class TimeIntervalWidget(QWidget):
@@ -105,13 +105,13 @@ class TimeIntervalWidget(QWidget):
 class TimeIntervalManager:
     def __init__(
         self,
-        metadata_cache_getter: Callable[[], MetadataModel],
+        context: AppContext,
         label: str,
         from_label: str,
         to_label: str,
         checked: bool = True,
     ) -> None:
-        self.__metadata_cache = metadata_cache_getter
+        self.context = context
 
         self.widget = TimeIntervalWidget(
             label,
@@ -123,9 +123,9 @@ class TimeIntervalManager:
         )
 
     def startup(self) -> None:
-        time_from: str = self.__metadata_cache().filters.time.time_from
-        time_to: str = self.__metadata_cache().filters.time.time_to
-        enabled = self.__metadata_cache().filters.time.enabled
+        time_from: str = self.context.metadata.filters.time.time_from
+        time_to: str = self.context.metadata.filters.time.time_to
+        enabled = self.context.metadata.filters.time.enabled
 
         self.widget.on_checkbox_toggled(enabled)
         self.widget.checkbox.setChecked(enabled)
@@ -136,7 +136,7 @@ class TimeIntervalManager:
         )
 
     def __on_checked(self, checked: bool) -> None:
-        self.__metadata_cache().filters.time.enabled = checked
+        self.context.metadata.filters.time.enabled = checked
 
     def __on_change(self) -> None:
         if not self.widget.is_enabled():
@@ -144,5 +144,5 @@ class TimeIntervalManager:
 
         time_from, time_to = self.widget.time_range
 
-        self.__metadata_cache().filters.time.time_from = time_from
-        self.__metadata_cache().filters.time.time_to = time_to
+        self.context.metadata.filters.time.time_from = time_from
+        self.context.metadata.filters.time.time_to = time_to

@@ -50,6 +50,7 @@ class VideoConcatenator:
         for item in source.rglob("**/*"):
             if item.is_dir():
                 continue
+
             match = index_pattern.match(item.name)
             if not match or item.name in self.ignore:
                 logger.debug("Skipping: {}", item.absolute().as_posix())

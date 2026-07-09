@@ -11,9 +11,10 @@ from PySide6.QtWidgets import (
 )
 
 from core.concatenator import VideoConcatenator
+from core.context import AppContext
 from core.database import FormatRegistry, Registry, VideoRegistry
+from core.helpers import MetadataHelper
 from core.meta import VideoMetaProcessor
-from core.mixins import MetadataMixin
 from core.models import AppInfoModel
 from core.utils import get_supported_formats
 from threads.manage import Runnable, TaskManager
@@ -31,7 +32,7 @@ from ui.widgets.version_widget import VersionManager
 from updates.git_updater import GitUpdater
 
 
-class MainWindow(QMainWindow, MetadataMixin):
+class MainWindow(QMainWindow):
     def __init__(
         self,
         ffmpeg: Path,
@@ -45,9 +46,13 @@ class MainWindow(QMainWindow, MetadataMixin):
         registry: Registry,
         log_level: str = "INFO",
     ) -> None:
-        super().__init__(inited_registry=registry, parent=None)
+        super().__init__(parent=None)
 
+        self.context = AppContext()
         self.registry = registry
+
+        self._metadata_helper = MetadataHelper(self.registry, self.context)
+
         self.ffmpeg = ffmpeg
 
         self._app_info = app_info
@@ -57,13 +62,13 @@ class MainWindow(QMainWindow, MetadataMixin):
 
         # --- Initialize Widget Managers ---
         self.input_dir_widget_manager = DirSelectorManger(
-            self.get_metadata_cache,
+            self.context,
             "input_dir",
             self.i18n.t("input_dir"),
             self.i18n.t("select_folder"),
         )
         self.output_dir_widget_manager = DirSelectorManger(
-            self.get_metadata_cache,
+            self.context,
             "output_dir",
             self.i18n.t("output_dir"),
             self.i18n.t("select_folder"),
@@ -73,7 +78,7 @@ class MainWindow(QMainWindow, MetadataMixin):
         self.progress_bar_manager = ProgressBarManager()
         self.elapsed_time_manger = ElapsedTimeManger(self.i18n.t("elapsed_time"))
         self.time_interval_filter_manager = TimeIntervalManager(
-            self.get_metadata_cache,
+            self.context,
             self.i18n.t("time_filter"),
             self.i18n.t("time_filter_label_time_from"),
             self.i18n.t("time_filter_label_time_to"),
@@ -81,7 +86,7 @@ class MainWindow(QMainWindow, MetadataMixin):
         self.concat_manager = ConcatManager(
             self.i18n.t("start"),
             self.i18n.t("stop"),
-            self.get_metadata_cache,
+            self.context,
             video_concatenator,
             meta_processor,
             getattr(
@@ -94,7 +99,7 @@ class MainWindow(QMainWindow, MetadataMixin):
             self.time_interval_filter_manager,
         )
         self.format_selector_manager = FormatSelectorManager(
-            self.get_metadata_cache,
+            self.context,
             self.i18n.t("format"),
         )
         self.version_manager = VersionManager(
@@ -162,7 +167,7 @@ class MainWindow(QMainWindow, MetadataMixin):
         self.setCentralWidget(container)
 
     def __update_metadata(self) -> None:
-        self.load_metadata()
+        self._metadata_helper.load_metadata()
 
         self.input_dir_widget_manager.startup()
         self.output_dir_widget_manager.startup()
@@ -202,11 +207,11 @@ class MainWindow(QMainWindow, MetadataMixin):
             global_pool.start(t)
 
         self.task_scheduler.add_task(
-            self.save_metadata,
+            self._metadata_helper.save_metadata,
             30,
         )
 
     def closeEvent(self, event: QCloseEvent) -> None:
-        self.save_metadata()
+        self._metadata_helper.save_metadata()
         self.task_scheduler.stop_all()
         super().closeEvent(event)

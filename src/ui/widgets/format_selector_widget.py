@@ -10,7 +10,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from core.models import MetadataModel, VideoFormat
+from core.context import AppContext
+from core.models import VideoFormat
 
 
 class FormatSelectorWidget(QWidget):
@@ -96,15 +97,15 @@ class FormatSelectorWidget(QWidget):
 class FormatSelectorManager:
     def __init__(
         self,
-        metadata_cache_getter: Callable[[], MetadataModel],
+        context: AppContext,
         label: str,
     ) -> None:
-        self.__metadata_cache = metadata_cache_getter
+        self.context = context
 
         self.widget = FormatSelectorWidget(label, self.__on_change)
 
     def startup(self) -> None:
-        self.widget.set_current_value(self.__metadata_cache().video_format)
+        self.widget.set_current_value(self.context.metadata.video_format)
 
     def __on_change(self, fmt: str) -> None:
-        self.__metadata_cache().video_format = fmt
+        self.context.metadata.video_format = fmt

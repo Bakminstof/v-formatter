@@ -1,15 +1,15 @@
 import time
 from pathlib import Path
-from typing import Callable, Iterator
+from typing import Iterator
 
 import humanize
 from loguru import logger
 from PySide6.QtWidgets import QHBoxLayout, QPushButton
 
-from core.concatenator import VideoConcatenator, VideosStructureModel
+from core.concatenator import VideoConcatenator
+from core.context import AppContext
 from core.database import VideoRegistry
 from core.meta import VideoMetaProcessor
-from core.models import MetadataModel
 from threads.workers.directory_worker import DirectoryWorker
 from ui.models import ConcatStatus
 from ui.widgets.elapsed_time_widget import ElapsedTimeManger
@@ -25,7 +25,7 @@ class ConcatManager:
         self,
         start_btn_label: str,
         stop_btn_label: str,
-        metadata_cache_getter: Callable[[], MetadataModel],
+        context: AppContext,
         video_concatenator: VideoConcatenator,
         meta_processor: VideoMetaProcessor,
         video_registry: VideoRegistry,
@@ -41,9 +41,8 @@ class ConcatManager:
         self.start_btn.clicked.connect(self.start)
         self.stop_btn.clicked.connect(self.stop)
 
-        #
-        self.__metadata_cache = metadata_cache_getter
-        self.videos_structure = VideosStructureModel()
+        # Logic
+        self.context = context
 
         self.video_concatenator = video_concatenator
         self.meta_processor = meta_processor
@@ -77,35 +76,35 @@ class ConcatManager:
         self.__concat_started = True
 
         if (
-            self.__metadata_cache().input_dir is None
-            or self.__metadata_cache().output_dir is None
-            or not self.__metadata_cache().input_dir.exists()
-            or not self.__metadata_cache().output_dir.exists()
+            self.context.metadata.input_dir is None
+            or self.context.metadata.output_dir is None
+            or not self.context.metadata.input_dir.exists()
+            or not self.context.metadata.output_dir.exists()
         ):
             logger.error(
                 "[{}] Input or output dir are invalid: input_dir={!r}, output_dir={!r}",
                 self,
-                str(self.__metadata_cache().input_dir),
-                str(self.__metadata_cache().output_dir),
+                str(self.context.metadata.input_dir),
+                str(self.context.metadata.output_dir),
             )
             self.__concat_started = False
             return
 
-        self.videos_structure = self.video_concatenator.collect_data_dirs(
-            self.__metadata_cache().input_dir,
-            self.__metadata_cache().output_dir,
-            self.__metadata_cache().video_format,
+        self.context.concat_structure = self.video_concatenator.collect_data_dirs(
+            self.context.metadata.input_dir,
+            self.context.metadata.output_dir,
+            self.context.metadata.video_format,
         )
 
         self.queue_manager.widget.clear()
         self.progress_bar_manager.widget.setValue(0)
 
-        for inp_path in self.videos_structure.data.keys():
+        for inp_path in self.context.concat_structure.data.keys():
             self.add_directory_status(inp_path.name, ConcatStatus.waiting)
 
-        self.__total_tasks = len(self.videos_structure.data)
+        self.__total_tasks = len(self.context.concat_structure.data)
         self.__current_task_index = 0
-        self.__current_task_iter = iter(self.videos_structure.data.keys())
+        self.__current_task_iter = iter(self.context.concat_structure.data.keys())
 
         self.__start_time = time.monotonic()
         self.elapsed_time_manger.widget.reset()
@@ -114,12 +113,12 @@ class ConcatManager:
         logger.info("Directories found: {}", self.__total_tasks)
 
         time_from = (
-            self.__metadata_cache().filters.time.time_from
+            self.context.metadata.filters.time.time_from
             if self.time_interval_filter_manager.widget.is_enabled()
             else None
         )
         time_to = (
-            self.__metadata_cache().filters.time.time_to
+            self.context.metadata.filters.time.time_to
             if self.time_interval_filter_manager.widget.is_enabled()
             else None
         )
@@ -176,7 +175,7 @@ class ConcatManager:
 
         worker = DirectoryWorker(
             inp_path,
-            self.videos_structure,
+            self.context.concat_structure,
             video_concatenator=self.video_concatenator,
             meta_processor=self.meta_processor,
             registry=self.video_registry,

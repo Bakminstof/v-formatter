@@ -3,7 +3,8 @@ from typing import Callable
 
 from PySide6.QtWidgets import QFileDialog, QHBoxLayout, QLineEdit, QPushButton, QWidget
 
-from core.models import Emojis, MetadataModel
+from core.context import AppContext
+from core.models import Emojis
 
 
 class DirSelectorWidget(QWidget):
@@ -68,14 +69,14 @@ class DirSelectorWidget(QWidget):
 class DirSelectorManger:
     def __init__(
         self,
-        metadata_cache_getter: Callable[[], MetadataModel],
+        context: AppContext,
         metadata_cache_key: str,
         placeholder_text: str,
         select_folder_label: str,
         push_btn_label: str = Emojis.dir,
     ) -> None:
         self.metadata_cache_key = metadata_cache_key
-        self.__metadata_cache = metadata_cache_getter
+        self.context = context
 
         self.widget = DirSelectorWidget(
             placeholder_text,
@@ -85,7 +86,7 @@ class DirSelectorManger:
         )
 
     def startup(self) -> None:
-        self.widget.set_path(str(getattr(self.__metadata_cache(), self.metadata_cache_key)))
+        self.widget.set_path(str(getattr(self.context.metadata, self.metadata_cache_key)))
 
     def __on_change(self, path: Path) -> None:
-        setattr(self.__metadata_cache(), self.metadata_cache_key, path)
+        setattr(self.context.metadata, self.metadata_cache_key, path)
