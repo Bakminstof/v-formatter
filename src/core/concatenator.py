@@ -16,6 +16,7 @@ type DestinationPath = Path
 class VideoDestinationInfoModel(BaseModel):
     destination: DestinationPath
     files: dict[Index, Path] = {}
+    process_it: bool = True
 
 
 class VideosStructureModel(BaseModel):

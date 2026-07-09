@@ -7,7 +7,7 @@ class Lang(StrEnum):
     ru_RU = "ru_RU"
 
 
-class ConcatStatus(StrEnum):
+class VideoDirStatus(StrEnum):
     waiting = "⏳"
     processing = "⚙️"
     not_found = "⦿"

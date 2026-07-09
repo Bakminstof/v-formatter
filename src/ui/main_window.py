@@ -27,6 +27,7 @@ from ui.widgets.log_widget import LogManager
 from ui.widgets.progress_bar_widget import ProgressBarManager
 from ui.widgets.queue_list_widget import QueueListManager
 from ui.widgets.repo_origin_widget import RepoOriginManager
+from ui.widgets.scan_widget import ScanManager
 from ui.widgets.time_interval_widget import TimeIntervalManager
 from ui.widgets.version_widget import VersionManager
 from updates.git_updater import GitUpdater
@@ -83,9 +84,19 @@ class MainWindow(QMainWindow):
             self.i18n.t("time_filter_label_time_from"),
             self.i18n.t("time_filter_label_time_to"),
         )
+        self.scen_manager = ScanManager(
+            self.i18n.t("scan.start"),
+            self.i18n.t("scan.stop"),
+            self.context,
+            meta_processor,
+            video_concatenator,
+            self.elapsed_time_manger,
+            self.progress_bar_manager,
+            self.queue_manager,
+        )
         self.concat_manager = ConcatManager(
-            self.i18n.t("start"),
-            self.i18n.t("stop"),
+            self.i18n.t("concat.start"),
+            self.i18n.t("concat.stop"),
             self.context,
             video_concatenator,
             meta_processor,
@@ -159,7 +170,10 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.log_manger.widget)
 
         # Buttons
-        layout.addLayout(self.concat_manager.layout())
+        buttons_layout = QHBoxLayout()
+        buttons_layout.addLayout(self.scen_manager.layout())
+        buttons_layout.addLayout(self.concat_manager.layout())
+        layout.addLayout(buttons_layout)
 
         container = QWidget()
         container.setLayout(layout)

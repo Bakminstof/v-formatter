@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from json import loads
 from pathlib import Path
@@ -44,8 +45,15 @@ class VideoMetaProcessor:
         if meta_model.mtime != stat.st_mtime or meta_model.size != stat.st_size:
             self._update(item)
 
-    def update_meta_bulk(self, items: Iterable[Path]) -> None:
-        run_in_thread_pool([(self.update_meta, (item,)) for item in items])
+    def update_meta_bulk(
+        self,
+        items: Iterable[Path],
+        *,
+        executor: ThreadPoolExecutor | None = None,
+    ) -> bool:
+        return run_in_thread_pool(
+            [(self.update_meta, (item,)) for item in items], executor=executor
+        )
 
     def load_video_meta(self, video_path: Path) -> VideoMetaModel:
         args = [

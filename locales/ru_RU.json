@@ -2,8 +2,10 @@
   "input_dir": "📂 Исходная папка",
   "output_dir": "📁 Папка результата",
   "select_folder": "Выберите папку",
-  "start": "▶️ Запуск",
-  "stop": "⏹ Остановить",
+  "concat": {
+    "start": "▶️ Склеить",
+    "stop": "⏹ Остановить слияние"
+  },
   "queue": "📋 Очередь",
   "progress": "📊 Прогресс",
   "logs": "🧾 Вывод",
@@ -13,6 +15,10 @@
   "time_filter_label_time_from": "с",
   "time_filter_label_time_to": "по",
   "update_do": "Обновить",
+  "scan": {
+    "start": "▶️ Сканировать",
+    "stop": "⏹ Остановить сканирование"
+  },
   "app_current_version": "Текущая версия",
   "app_all_versions": "Доступные версии",
   "origin": {
