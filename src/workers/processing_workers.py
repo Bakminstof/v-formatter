@@ -32,7 +32,7 @@ class VideoProcessingWorkerProtocol[E](Protocol):
     @property
     def running(self) -> bool: ...
 
-    def start(self, target_dir: Path, *args, **kwargs) -> None | VideoDirStatus: ...
+    def start(self, target_dir: Path) -> None | VideoDirStatus: ...
     def stop(self) -> None: ...
 
 
@@ -71,7 +71,7 @@ class ScanWorker(VideoProcessingWorkerProtocol[ProcessPoolExecutorThread], ReprM
 
         self.executor.stop_all_processes()
 
-    def start(self, target_dir: Path, *args, **kwargs) -> None | VideoDirStatus:
+    def start(self, target_dir: Path) -> None | VideoDirStatus:
         self.__indexed_structure.clear()
 
         if not self.__context.concat_structure.data[target_dir].process_it:
@@ -174,11 +174,10 @@ class ConcatWorker(VideoProcessingWorkerProtocol[ProcessQueueExecutorThread], Re
     def start(
         self,
         target_dir: Path,
-        *args,
-        start_at: str | None = None,
-        end_at: str | None = None,
-        **kwargs,
     ) -> VideoDirStatus | None:
+        start_at = self.__context.metadata.filters.time.time_from
+        end_at = self.__context.metadata.filters.time.time_to
+
         time_interval = (start_at, end_at) if start_at and end_at else None
 
         if not self.__context.concat_structure.data[target_dir].process_it:
