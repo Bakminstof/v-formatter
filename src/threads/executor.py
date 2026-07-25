@@ -12,7 +12,7 @@ from core.mixins import ReprMixin
 from processes import ManagedProcessProtocol, ProcessResult, ProcessState
 
 MANAGED_PROCESS_FINISHED_EVENT_TYPE = QEvent.Type(QEvent.Type.User + 1)
-DEFAULT_MAX_PROCESS_WORKERS = min(cpu_count() * 100, 1024)
+DEFAULT_MAX_PROCESS_WORKERS = max(cpu_count() * 2, 32)
 
 
 class ProcessFinishedEvent(QEvent):
