@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from enum import StrEnum
+from enum import StrEnum, auto
 from pathlib import Path
 from re import match
 from sqlite3 import Row
@@ -22,11 +22,11 @@ class AppInfoModel(BaseModel):
 
 class VideoMetaModel(BaseModel):
     file_path: Path
-    mtime: float
+    mtime: float | int
     size: int
     start_datetime: datetime
     end_datetime: datetime
-    duration: float
+    duration: float | int
     error: str | None = None
     processed_at: datetime = datetime.now()
 
@@ -98,3 +98,18 @@ class VideoFormat(BaseModel):
 
     def __hash__(self) -> int:
         return hash(self.extension)
+
+
+type SourcePath = Path
+type Index = int
+type DestinationPath = Path
+
+
+class VideoDestinationInfoModel(BaseModel):
+    destination: DestinationPath
+    files: dict[Index, Path] = {}
+    process_it: bool = True
+
+
+class VideosStructureModel(BaseModel):
+    data: dict[SourcePath, VideoDestinationInfoModel] = {}

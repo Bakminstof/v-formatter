@@ -1,6 +1,7 @@
 from pathlib import Path
+from queue import Queue
 
-from PySide6.QtCore import QThreadPool
+from PySide6.QtCore import QEvent, QThreadPool
 from PySide6.QtGui import QCloseEvent, QIcon
 from PySide6.QtWidgets import (
     QHBoxLayout,
@@ -17,8 +18,16 @@ from core.helpers import MetadataHelper
 from core.meta import VideoMetaProcessor
 from core.models import AppInfoModel
 from core.utils import get_supported_formats
-from threads.manage import Runnable, TaskManager
+from processes import ProcessResult
+from threads.executor import (
+    MANAGED_PROCESS_FINISHED_EVENT_TYPE,
+    ProcessFinishedEvent,
+    ProcessPoolExecutorThread,
+    ProcessQueueExecutorThread,
+)
+from threads.manage import Runnable, TaskScheduler
 from ui.i18n import I18n
+from ui.models import VideoDirStatus
 from ui.widgets.concat_widget import ConcatManager
 from ui.widgets.dir_selector_widget import DirSelectorManger
 from ui.widgets.elapsed_time_widget import ElapsedTimeManger
@@ -31,6 +40,7 @@ from ui.widgets.scan_widget import ScanManager
 from ui.widgets.time_interval_widget import TimeIntervalManager
 from ui.widgets.version_widget import VersionManager
 from updates.git_updater import GitUpdater
+from workers.processing_workers import VideoProcessingAction
 
 
 class MainWindow(QMainWindow):
@@ -49,7 +59,7 @@ class MainWindow(QMainWindow):
     ) -> None:
         super().__init__(parent=None)
 
-        self.context = AppContext()
+        self.context = AppContext(i18n=i18n)
         self.registry = registry
 
         self._metadata_helper = MetadataHelper(self.registry, self.context)
@@ -75,7 +85,7 @@ class MainWindow(QMainWindow):
             self.i18n.t("select_folder"),
         )
         self.log_manger = LogManager(log_level)
-        self.queue_manager = QueueListManager()
+        self.queue_manager = QueueListManager(self.context)
         self.progress_bar_manager = ProgressBarManager()
         self.elapsed_time_manger = ElapsedTimeManger(self.i18n.t("elapsed_time"))
         self.time_interval_filter_manager = TimeIntervalManager(
@@ -84,30 +94,30 @@ class MainWindow(QMainWindow):
             self.i18n.t("time_filter_label_time_from"),
             self.i18n.t("time_filter_label_time_to"),
         )
-        self.scen_manager = ScanManager(
-            self.i18n.t("scan.start"),
-            self.i18n.t("scan.stop"),
-            self.context,
-            meta_processor,
-            video_concatenator,
-            self.elapsed_time_manger,
-            self.progress_bar_manager,
-            self.queue_manager,
+        self.scan_manager = ScanManager(
+            start_btn_label=self.i18n.t("scan.start"),
+            stop_btn_label=self.i18n.t("scan.stop"),
+            context=self.context,
+            gui_receiver=self,
+            meta_processor=meta_processor,
+            video_concatenator=video_concatenator,
+            elapsed_time_manger=self.elapsed_time_manger,
+            progress_bar_manager=self.progress_bar_manager,
+            queue_manager=self.queue_manager,
         )
         self.concat_manager = ConcatManager(
-            self.i18n.t("concat.start"),
-            self.i18n.t("concat.stop"),
-            self.context,
-            video_concatenator,
-            meta_processor,
-            getattr(
+            start_btn_label=self.i18n.t("concat.start"),
+            stop_btn_label=self.i18n.t("concat.stop"),
+            context=self.context,
+            gui_receiver=self,
+            video_concatenator=video_concatenator,
+            elapsed_time_manger=self.elapsed_time_manger,
+            progress_bar_manager=self.progress_bar_manager,
+            queue_manager=self.queue_manager,
+            video_registry=getattr(
                 registry,
                 VideoRegistry.__table_name__,
             ),
-            self.elapsed_time_manger,
-            self.progress_bar_manager,
-            self.queue_manager,
-            self.time_interval_filter_manager,
         )
         self.format_selector_manager = FormatSelectorManager(
             self.context,
@@ -124,7 +134,7 @@ class MainWindow(QMainWindow):
         self.repo_origin_manager = RepoOriginManager(self._app_info, i18n, origin_icon_path)
 
         # Tasks
-        self.task_scheduler = TaskManager()
+        self.task_scheduler = TaskScheduler()
 
         self.__build_layout()
         self.__on_startup()
@@ -171,7 +181,7 @@ class MainWindow(QMainWindow):
 
         # Buttons
         buttons_layout = QHBoxLayout()
-        buttons_layout.addLayout(self.scen_manager.layout())
+        buttons_layout.addLayout(self.scan_manager.layout())
         buttons_layout.addLayout(self.concat_manager.layout())
         layout.addLayout(buttons_layout)
 
@@ -208,7 +218,36 @@ class MainWindow(QMainWindow):
         self.format_selector_manager.widget.fill(formats)
         self.format_selector_manager.startup()
 
+    def __startup_process_infrastructure(self) -> None:
+        self.context.processes.sequential_queue = Queue(self.context.processes.queue_max_size)
+        self.context.processes.pool_queue = Queue(self.context.processes.queue_max_size)
+
+        self.context.processes.sequential_executor = ProcessQueueExecutorThread(
+            self,
+            self.context.processes.sequential_queue,
+        )
+        self.context.processes.pool_executor = ProcessPoolExecutorThread(
+            self,
+            self.context.processes.pool_queue,
+        )
+
+        executors = self.context.processes.sequential_executor, self.context.processes.pool_executor
+
+        for executor in executors:
+            executor.start()
+
+    def __shutdown_process_infrastructure(self) -> None:
+        executors = self.context.processes.sequential_executor, self.context.processes.pool_executor
+
+        for executor in executors:
+            if not executor:
+                continue
+
+            executor.stop()
+
     def __on_startup(self) -> None:
+        self.__startup_process_infrastructure()
+
         global_pool = QThreadPool.globalInstance()
         tasks = [
             Runnable(self.__update_metadata),
@@ -225,7 +264,31 @@ class MainWindow(QMainWindow):
             30,
         )
 
+    def event(self, e: QEvent) -> bool:
+        if e.type() == MANAGED_PROCESS_FINISHED_EVENT_TYPE:
+            e: ProcessFinishedEvent
+
+            if (
+                e.meta.get("action") is VideoProcessingAction.scan
+                and e.meta.get("is_success") is not None
+            ):
+                status = VideoDirStatus.done if e.meta.get("is_success") else VideoDirStatus.error
+                self.scan_manager.on_task_finished(e.meta["processed_dir"], status)
+                return True
+
+            if e.meta.get("action") is VideoProcessingAction.concat and e.result:
+                if isinstance(e.result, ProcessResult) and e.result.exit_code == 0:
+                    status = VideoDirStatus.done
+                else:
+                    status = VideoDirStatus.error
+
+                self.concat_manager.on_task_finished(e.meta["processed_dir"], status)
+                return True
+
+        return super().event(e)
+
     def closeEvent(self, event: QCloseEvent) -> None:
         self._metadata_helper.save_metadata()
         self.task_scheduler.stop_all()
+        self.__shutdown_process_infrastructure()
         super().closeEvent(event)

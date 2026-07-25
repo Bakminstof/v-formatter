@@ -12,10 +12,10 @@ from PySide6.QtWidgets import (
 )
 
 from core.models import UNKNOWN_VERSION, VersionsInfoModel
-from threads.workers.prepare_update_worker import PrepareUpdateWorker
 from ui.i18n import I18n
 from ui.models import VersionStatus
 from updates.git_updater import GitUpdater
+from workers.prepare_update_worker import PrepareUpdateWorker
 
 
 class VersionWidget(QWidget):

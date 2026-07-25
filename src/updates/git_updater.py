@@ -11,7 +11,7 @@ from loguru import logger
 from packaging.version import InvalidVersion, Version
 
 from core.models import UNKNOWN_VERSION, VersionsInfoModel
-from core.process import ManagedProcess
+from processes import ManagedProcess
 
 
 class GitUpdater:
@@ -133,15 +133,15 @@ class GitUpdater:
             ManagedProcess(
                 f"{self}|Clean",
                 [self.repo.git.GIT_PYTHON_GIT_EXECUTABLE, "clean", "-fd"],
-                error_flags=(),
-                output_log_level="DEBUG",
+                error_flags=frozenset(),
+                log_level="DEBUG",
             ).run()
 
             ManagedProcess(
                 f"{self}|Reset",
                 [self.repo.git.GIT_PYTHON_GIT_EXECUTABLE, "reset", "--hard"],
-                error_flags=(),
-                output_log_level="DEBUG",
+                error_flags=frozenset(),
+                log_level="DEBUG",
             ).run()
 
             elapsed = time.monotonic() - start
@@ -173,8 +173,8 @@ class GitUpdater:
                     "--prune-tags",
                     "--progress",
                 ],
-                error_flags=(),
-                output_log_level="DEBUG",
+                error_flags=frozenset(),
+                log_level="DEBUG",
             ).run()
 
             logger.debug("[{}|LFS Fetch] Starting fetch", self)
@@ -182,8 +182,8 @@ class GitUpdater:
             ManagedProcess(
                 f"{self}|LFS Fetch",
                 [self.repo.git.GIT_PYTHON_GIT_EXECUTABLE, "lfs", "fetch"],
-                error_flags=(),
-                output_log_level="DEBUG",
+                error_flags=frozenset(),
+                log_level="DEBUG",
             ).run()
 
             logger.debug("[{}|LFS Fetch] Done!", self)
@@ -217,9 +217,9 @@ class GitUpdater:
                 self.portable_git_base_dir,
                 self.tools_tmp_dir / self.portable_git_base_dir.name,
             ],
-            error_flags=(),
+            error_flags=frozenset(),
             shell=True,
-            output_log_level="DEBUG",
+            log_level="DEBUG",
         ).run()
 
         self.updater_tmp_dir.mkdir(exist_ok=True, parents=True)

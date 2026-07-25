@@ -1,7 +1,7 @@
 from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import suppress
 from multiprocessing import cpu_count
-from queue import Empty, Queue, ShutDown
+from queue import Queue, ShutDown
 from threading import Event, Lock, Thread
 from typing import Callable
 
@@ -9,10 +9,10 @@ from loguru import logger
 from PySide6.QtCore import QCoreApplication, QEvent, QObject
 
 from core.mixins import ReprMixin
-from processes import ManagedProcess, ProcessResult, ProcessState
+from processes import ManagedProcessProtocol, ProcessResult, ProcessState
 
 MANAGED_PROCESS_FINISHED_EVENT_TYPE = QEvent.Type(QEvent.Type.User + 1)
-DEFAULT_MAX_PROCESS_WORKERS = min(cpu_count(), 16)
+DEFAULT_MAX_PROCESS_WORKERS = min(cpu_count() * 2, 32)
 
 
 class ProcessFinishedEvent(QEvent):
@@ -32,42 +32,61 @@ class ProcessQueueExecutorThread(Thread, ReprMixin):
     def __init__(
         self,
         gui_receiver: QObject,
-        queue: Queue[tuple[ManagedProcess | None, Callable | None]],
+        queue: Queue[
+            tuple[
+                ManagedProcessProtocol | None,
+                list[Callable[[ManagedProcessProtocol], None]] | None,
+            ]
+        ],
     ) -> None:
         super().__init__(daemon=True)
 
         self.__queue = queue
-
         self.__gui_receiver = gui_receiver
 
-        self.__process: ManagedProcess | None = None
-        self.__process_stop_fn: Callable | None = None
+        self.__process: ManagedProcessProtocol | None = None
+        self.__process_callbacks: list[Callable[[ManagedProcessProtocol], None]] = []
 
         self.__lock = Lock()
-
         self.__manager = ProcessManagerThread()
-
         self.__started = False
 
     @property
-    def process(self) -> ManagedProcess | None:
+    def process(self) -> ManagedProcessProtocol | None:
         return self.__process or None
 
-    def put(self, p: ManagedProcess, stop_fn: Callable | None = None) -> None:
-        self.__queue.put((p, stop_fn))
+    def put(
+        self,
+        p: ManagedProcessProtocol,
+        on_finish: (
+            Callable[[ManagedProcessProtocol], None]
+            | list[Callable[[ManagedProcessProtocol], None]]
+            | None
+        ) = None,
+    ) -> None:
+        if self.__queue.is_shutdown:
+            return
+
+        if on_finish is None:
+            callbacks = []
+        elif callable(on_finish):
+            callbacks = [on_finish]
+        else:
+            callbacks = on_finish
+
+        callbacks: list[Callable[[ManagedProcessProtocol], None]]
+
+        self.__queue.put((p, callbacks))
 
     def run(self) -> None:
         logger.debug("[{}] Start", self)
 
         self.__started = True
-
         self.__manager.start()
 
         while self.__started:
             try:
-                p, stop = self.__queue.get(timeout=1)
-            except Empty:
-                continue
+                p, callbacks = self.__queue.get()
             except ShutDown:
                 break
 
@@ -77,23 +96,19 @@ class ProcessQueueExecutorThread(Thread, ReprMixin):
                 break
 
             self.__process = p
-            self.__process_stop_fn = stop
-
-            title = self.process.title if self.process else None
+            self.__process_callbacks = callbacks or []
 
             try:
-                res = self.__process.run()
+                res = p.run()
             except Exception as e:
-                logger.error("[{}]: {}", title, str(e))
+                logger.error("[{}]: {}", p.title, str(e))
                 res = e
             finally:
                 self.__queue.task_done()
 
-            event = ProcessFinishedEvent(
-                title,
-                res,
-                p.metadata,
-            )
+            self.__invoke_callbacks(self.__process_callbacks, p)
+
+            event = ProcessFinishedEvent(p.title, res, p.metadata)
             QCoreApplication.postEvent(self.__gui_receiver, event)
 
         logger.debug("[{}] Finished", self)
@@ -119,15 +134,25 @@ class ProcessQueueExecutorThread(Thread, ReprMixin):
         self.__queue.put((None, None))
         self.__queue.shutdown(immediate=True)
 
+    def dispose(self) -> None:
+        self.__process = None
+
+    @property
+    def running(self) -> bool:
+        if not self.__process:
+            return False
+
+        return self.__process.result.state is ProcessState.RUNNING
+
     def __stop_process(self) -> None:
-        if not self.process:
+        if not self.__process:
             return
 
         with self.__lock:
-            if not self.process.result.state is ProcessState.RUNNING:
+            if not self.__process.result.state is ProcessState.RUNNING:
                 return
 
-            title = self.process.title if self.process else None
+            title = self.__process.title if self.process else None
 
             logger.debug(
                 "[{}] Stopping process: {!r}",
@@ -135,10 +160,7 @@ class ProcessQueueExecutorThread(Thread, ReprMixin):
                 title,
             )
 
-            if self.__process_stop_fn is not None:
-                self.__process_stop_fn()
-            else:
-                self.__process.stop()
+            self.__process.stop()
 
             logger.debug(
                 "[{}] Stopped process: {!r}",
@@ -152,12 +174,45 @@ class ProcessQueueExecutorThread(Thread, ReprMixin):
         else:
             self.__manager.put(self.__stop_process)
 
+    def add_on_finish_callbacks(
+        self,
+        *callbacks: Callable[[ManagedProcessProtocol], None],
+    ) -> None:
+        with self.__lock:
+            self.__process_callbacks.extend(self.__normalize_callbacks(*callbacks))
+
+    @staticmethod
+    def __normalize_callbacks(
+        *on_finish_callbacks: Callable[[ManagedProcessProtocol], None],
+    ) -> list[Callable[[ManagedProcessProtocol], None]]:
+        return [i for i in on_finish_callbacks if callable(i)]
+
+    def __invoke_callbacks(
+        self,
+        callbacks: list[Callable[[ManagedProcessProtocol], None]],
+        process: ManagedProcessProtocol,
+    ) -> None:
+        for cb in callbacks:
+            cb_name = getattr(cb, "__qualname__", None) or getattr(cb, "__name__", str(cb))
+
+            logger.debug("[{}] Invoke callback: {}", self, cb_name)
+
+            try:
+                cb(process)
+            except Exception as e:
+                logger.exception("[{}] Callback error: {}", self, str(e), exc_info=e)
+
 
 class ProcessPoolExecutorThread(Thread, ReprMixin):
     def __init__(
         self,
         gui_receiver: QObject,
-        queue: Queue[tuple[ManagedProcess | None, Callable | None]],
+        queue: Queue[
+            tuple[
+                ManagedProcessProtocol | None,
+                list[Callable[[ManagedProcessProtocol], None]] | None,
+            ]
+        ],
         max_workers: int = DEFAULT_MAX_PROCESS_WORKERS,
     ) -> None:
         super().__init__(daemon=True)
@@ -166,7 +221,13 @@ class ProcessPoolExecutorThread(Thread, ReprMixin):
         self.__gui_receiver = gui_receiver
         self.__max_workers = max_workers
 
-        self.__active: dict[Future, tuple[ManagedProcess, Callable | None]] = {}
+        self.__active: dict[
+            Future,
+            tuple[
+                ManagedProcessProtocol,
+                list[Callable[[ManagedProcessProtocol], None]],
+            ],
+        ] = {}
         self.__lock = Lock()
         self.__started = False
         self.__stop_event = Event()
@@ -174,25 +235,50 @@ class ProcessPoolExecutorThread(Thread, ReprMixin):
         self.__manager = ProcessManagerThread()
 
     @property
-    def processes(self) -> dict[Future, tuple[ManagedProcess, Callable | None]]:
+    def processes(
+        self,
+    ) -> dict[
+        Future,
+        tuple[
+            ManagedProcessProtocol,
+            list[Callable[[ManagedProcessProtocol], None]],
+        ],
+    ]:
         return self.__active
 
-    def put(self, p: ManagedProcess, stop_fn: Callable | None = None) -> None:
-        self.__queue.put((p, stop_fn))
+    def put(
+        self,
+        p: ManagedProcessProtocol,
+        on_finish: (
+            Callable[[ManagedProcessProtocol], None]
+            | list[Callable[[ManagedProcessProtocol], None]]
+            | None
+        ) = None,
+    ) -> None:
+        if self.__queue.is_shutdown:
+            return
+
+        if on_finish is None:
+            callbacks = []
+        elif callable(on_finish):
+            callbacks = [on_finish]
+        else:
+            callbacks = on_finish
+
+        callbacks: list[Callable[[ManagedProcessProtocol], None]]
+
+        self.__queue.put((p, callbacks))
 
     def run(self) -> None:
         logger.debug("[{}] Start", self)
 
         self.__started = True
-
         self.__manager.start()
 
         with ThreadPoolExecutor(max_workers=self.__max_workers) as executor:
             while not self.__stop_event.is_set():
                 try:
-                    p, stop_fn = self.__queue.get(timeout=1)
-                except Empty:
-                    continue
+                    p, callbacks = self.__queue.get()
                 except ShutDown:
                     break
 
@@ -201,10 +287,12 @@ class ProcessPoolExecutorThread(Thread, ReprMixin):
                     self.__queue.task_done()
                     break
 
-                future = executor.submit(self.__execute_process, p, stop_fn)
+                callbacks = callbacks or []
+
+                future = executor.submit(self.__execute_process, p, callbacks)
 
                 with self.__lock:
-                    self.__active[future] = (p, stop_fn)
+                    self.__active[future] = (p, callbacks)
 
                 self.__queue.task_done()
 
@@ -214,8 +302,8 @@ class ProcessPoolExecutorThread(Thread, ReprMixin):
 
     def __execute_process(
         self,
-        process: ManagedProcess,
-        stop_fn: Callable | None,
+        process: ManagedProcessProtocol,
+        callbacks: list[Callable[[ManagedProcessProtocol], None]],
     ) -> None:
         title = process.title if process else None
 
@@ -226,14 +314,35 @@ class ProcessPoolExecutorThread(Thread, ReprMixin):
             res = e
         finally:
             with self.__lock:
-
                 to_remove = [fut for fut, (proc, _) in self.__active.items() if proc is process]
 
                 for fut in to_remove:
                     del self.__active[fut]
 
+        self.__invoke_callbacks(callbacks, process)
+
         event = ProcessFinishedEvent(title, res, process.metadata)
         QCoreApplication.postEvent(self.__gui_receiver, event)
+
+    def add_on_finish_callbacks(
+        self,
+        process: ManagedProcessProtocol,
+        *callbacks: Callable[[ManagedProcessProtocol], None],
+    ) -> None:
+        with self.__lock:
+            for proc, existing_callbacks in self.__active.values():
+                if proc is process:
+                    existing_callbacks.extend(self.__normalize_callbacks(*callbacks))
+                    logger.debug(
+                        "[{}] Added on finish callbacks for process: {}",
+                        self,
+                        process,
+                    )
+                    break
+            else:
+                logger.error(
+                    "[{}] Adding on finish callbacks fail! Not found process: {}", self, process
+                )
 
     def __stop_manager(self) -> None:
         with self.__lock:
@@ -241,10 +350,18 @@ class ProcessPoolExecutorThread(Thread, ReprMixin):
                 self.__manager.stop()
 
     def stop_all_processes(self, block: bool = False) -> None:
-        if block:
-            self.__stop_all()
-        else:
-            self.__manager.put(self.__stop_all)
+        logger.debug("[{}] Stopping all processes", self)
+
+        with self.__lock:
+            for process, _ in self.__active.values():
+                try:
+                    if block:
+                        process.stop()
+                    else:
+                        self.__manager.put(process.stop)
+
+                except Exception as e:
+                    logger.error("[{}] Error stopping process: {}", self, e)
 
     def stop(self) -> None:
         logger.debug("[{}] Stopping", self)
@@ -255,36 +372,16 @@ class ProcessPoolExecutorThread(Thread, ReprMixin):
 
         logger.debug("[{}] Stopped", self)
 
-    def __stop_all(self) -> None:
-        logger.debug("[{}] Stopping all processes", self)
+    @property
+    def running(self) -> bool:
+        return any([p.result.state is ProcessState.RUNNING for p, _ in self.__active.values()])
 
+    def stop_process(self, process: ManagedProcessProtocol) -> None:
         with self.__lock:
-            for process, stop_fn in self.__active.values():
-                try:
-                    if stop_fn is not None:
-                        stop_fn()
-                    else:
-                        process.stop()
-                except Exception as e:
-                    logger.error("[{}] Error stopping process: {}", self, e)
-
-        self.__stop_event.set()
-        self.__stop_queue()
-
-        if self.is_alive():
-            self.join(timeout=10)
-
-        logger.debug("[{}] Stopped", self)
-
-    def stop_process(self, process: ManagedProcess) -> None:
-        with self.__lock:
-            for future, (proc, stop_fn) in self.__active.items():
+            for future, (proc, _) in self.__active.items():
                 if proc is process:
                     try:
-                        if stop_fn is not None:
-                            stop_fn()
-                        else:
-                            process.stop()
+                        process.stop()
                     except Exception as e:
                         logger.error("[{}] Error stopping process: {}", self, e)
                     break
@@ -295,13 +392,11 @@ class ProcessPoolExecutorThread(Thread, ReprMixin):
                 if not self.__active:
                     break
 
-            self.__stop_event.wait(0.5)
+            self.__stop_event.wait(0.1)
 
-        if self.__stop_event.is_set():
-            with self.__lock:
-                for process, stop_fn in self.__active.values():
-                    with suppress(Exception):
-                        process.stop(force=True)
+        with self.__lock, suppress(Exception):
+            for process, _ in self.__active.values():
+                process.stop(force=True)
 
     def __stop_queue(self) -> None:
         if self.__queue.is_shutdown:
@@ -310,9 +405,34 @@ class ProcessPoolExecutorThread(Thread, ReprMixin):
         with suppress(Exception):
             self.__queue.put((None, None))
 
+    @staticmethod
+    def __normalize_callbacks(
+        *on_finish_callbacks: Callable[[ManagedProcessProtocol], None],
+    ) -> list[Callable[[ManagedProcessProtocol], None]]:
+        return [i for i in on_finish_callbacks if callable(i)]
+
+    def __invoke_callbacks(
+        self,
+        callbacks: list[Callable[[ManagedProcessProtocol], None]],
+        process: ManagedProcessProtocol,
+    ) -> None:
+        for cb in callbacks:
+            cb_name = getattr(cb, "__qualname__", None) or getattr(cb, "__name__", str(cb))
+
+            logger.debug("[{}] Invoke callback: {}", self, cb_name)
+
+            try:
+                cb(process)
+            except Exception as e:
+                logger.exception("[{}] Callback error: {}", self, str(e), exc_info=e)
+
 
 class ProcessManagerThread(Thread, ReprMixin):
-    def __init__(self, max_workers: int = 10, queue_size: int = 100) -> None:
+    def __init__(
+        self,
+        max_workers: int = DEFAULT_MAX_PROCESS_WORKERS,
+        queue_size: int = 10_000,
+    ) -> None:
         super().__init__(daemon=True)
 
         self.__executor = ThreadPoolExecutor(max_workers=max_workers)
@@ -329,9 +449,7 @@ class ProcessManagerThread(Thread, ReprMixin):
 
         while self.__started:
             try:
-                c, args, kwargs = self.__queue.get(timeout=1)
-            except Empty:
-                continue
+                c, args, kwargs = self.__queue.get()
             except ShutDown:
                 break
 

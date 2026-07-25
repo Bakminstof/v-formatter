@@ -10,7 +10,7 @@ class Lang(StrEnum):
 class VideoDirStatus(StrEnum):
     waiting = "⏳"
     processing = "⚙️"
-    not_found = "⦿"
+    empty = "⦿"
     done = "✅"
     error = "❌"
     unknown = "❓"

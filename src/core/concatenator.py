@@ -1,26 +1,12 @@
 from pathlib import Path
 from re import compile as re_compile
-from shutil import rmtree
 from uuid import uuid4
 
 from loguru import logger
-from pydantic import BaseModel
 
-from core.process import ManagedProcess
-
-type SourcePath = Path
-type Index = int
-type DestinationPath = Path
-
-
-class VideoDestinationInfoModel(BaseModel):
-    destination: DestinationPath
-    files: dict[Index, Path] = {}
-    process_it: bool = True
-
-
-class VideosStructureModel(BaseModel):
-    data: dict[SourcePath, VideoDestinationInfoModel] = {}
+from core.models import VideoDestinationInfoModel, VideosStructureModel
+from processes import ProcessResult
+from workers.process import FFProcess
 
 
 class VideoConcatenator:
@@ -65,6 +51,7 @@ class VideoConcatenator:
                     destination=destination / parent.name,
                     files={},
                 )
+
             videos_structure.data[parent].files[index] = item
 
         return videos_structure
@@ -94,8 +81,8 @@ class VideoConcatenator:
         destination: Path,
         target_suffix: str,
         *,
-        process: ManagedProcess | None = None,
-    ) -> tuple[int, Path]:
+        run: bool = True,
+    ) -> FFProcess | ProcessResult:
         result_filename = f"{source.name}{target_suffix}"
         result_file = destination / result_filename
         result_file.unlink(missing_ok=True)
@@ -114,26 +101,27 @@ class VideoConcatenator:
         ]
 
         title = f"FFMpeg|Current: {source.name}"
-        if process is None:
-            process = ManagedProcess(title, ffmpeg_args)
-        else:
-            process.command = ffmpeg_args
-            process.title = title
+        p = FFProcess(
+            title,
+            ffmpeg_args,
+            metadata={
+                "processed_dir": source,
+            },
+        )
 
-        res = process.run()
-        rmtree(self.tmp_dir)
-        return res.exit_code, result_file
+        if run:
+            return p.run()
 
-    def process_directory(
+        return p
+
+    def __prepare_dir_proc(
         self,
         source: Path,
         source_files: dict[int, Path],
         destination: Path,
-        *,
-        process: ManagedProcess | None = None,
-    ) -> tuple[int, Path | None]:
+    ) -> FFProcess | ProcessResult | None:
         if not source_files:
-            return -1, None
+            return None
 
         sorted_indices = sorted(source_files.keys())
         sorted_files = [source_files[idx] for idx in sorted_indices]
@@ -145,29 +133,22 @@ class VideoConcatenator:
             list_file,
             destination,
             target_suffix,
-            process=process,
+            run=False,
         )
 
-    def run(
+    def prepare_run(
         self,
         source: Path,
         source_files: dict[int, Path],
         destination: Path,
-        *,
-        process: ManagedProcess | None = None,
-    ) -> tuple[int, Path | None]:
+    ) -> FFProcess | None:
         if not source.is_dir():
             raise NotADirectoryError(source)
 
         destination.mkdir(parents=True, exist_ok=True)
 
-        try:
-            return self.process_directory(
-                source,
-                source_files,
-                destination,
-                process=process,
-            )
-        except KeyboardInterrupt:
-            logger.warning("[User] Interrupt")
-            return -1, None
+        return self.__prepare_dir_proc(  # type: ignore
+            source,
+            source_files,
+            destination,
+        )

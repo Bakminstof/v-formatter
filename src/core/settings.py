@@ -1,4 +1,5 @@
 from functools import cached_property
+from os import getenv
 from pathlib import Path
 from tempfile import gettempdir
 
@@ -16,11 +17,20 @@ BASE_DIR = Path(__file__).parent.parent.resolve()
 LOGS_DIR = BASE_DIR.parent / "logs"
 BINARIES_DIR = BASE_DIR.parent / "binaries"
 MEDIA_DATA_DIR = BASE_DIR.parent / "media"
+DB_DIR = BASE_DIR.parent / "db"
 TOOLS_DIR = BASE_DIR.parent / "tools"
+
 TMP_DIR = Path(gettempdir()).resolve(True) / APP_NAME
 TMP_DIR.mkdir(exist_ok=True, parents=True)
 
-DB_DIR = BASE_DIR.parent / "db"
+XDG_DATA_HOME = getenv("XDG_DATA_HOME")
+
+if XDG_DATA_HOME:
+    LOCAL_DATA_PATH = Path(XDG_DATA_HOME)
+else:
+    LOCAL_DATA_PATH = Path.home() / ".local" / "share"
+
+APP_DATA_PATH = LOCAL_DATA_PATH / APP_NAME
 
 GITHUB_BASE_URL = "https://github.com"
 
@@ -76,9 +86,8 @@ class I18nSettings(BaseModel):
 class UpdatesSettings(BaseModel):
     fetch_interval_s: int = 600
 
-    updater_tmp_dir: Path = TMP_DIR / "updates"
-
-    tools_tmp_dir: Path = TMP_DIR / "tools"
+    updater_dir: Path = APP_DATA_PATH / "updates"
+    tools_dir: Path = APP_DATA_PATH / "tools"
 
     insecure: bool = False
 

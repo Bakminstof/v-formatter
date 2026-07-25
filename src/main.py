@@ -1,5 +1,6 @@
 from os import environ as env
 from pathlib import Path
+from shutil import rmtree
 from sys import argv, path
 
 ROOT_DIR = Path(__file__).parent.resolve()
@@ -11,9 +12,9 @@ GIT_DIR = REPOSITORY_ROOT / "tools" / "PortableGit" / "cmd"
 GIT_DIR_STR = GIT_DIR.absolute().as_posix()
 
 env["GIT_PYTHON_GIT_EXECUTABLE"] = (GIT_DIR / "git.exe").resolve(True).absolute().as_posix()
+env["QT_FATAL_WARNINGS"] = "1"
 
-path.append(GIT_DIR_STR)
-path.append(ROOT_DIR_PATH_STR)
+path.extend([GIT_DIR_STR, ROOT_DIR_PATH_STR])
 
 from loguru import logger
 from PySide6.QtWidgets import QApplication
@@ -70,8 +71,8 @@ def main() -> None:
         github_owner=settings.origin.owner,
         github_repo=settings.origin.repo,
         portable_git_base_dir=settings.tools.portable_git_base_dir,
-        updater_tmp_dir=settings.updates.updater_tmp_dir,
-        tools_tmp_dir=settings.updates.tools_tmp_dir,
+        updater_tmp_dir=settings.updates.updater_dir,
+        tools_tmp_dir=settings.updates.tools_dir,
     )
     i18n = I18n(
         get_windows_ui_language(settings.i18n.default_locale),
@@ -102,6 +103,7 @@ def main() -> None:
         logger.info("Application exited successfully")
 
     registry.close()
+    rmtree(settings.tmp_dir)
 
     exit(exit_code)
 

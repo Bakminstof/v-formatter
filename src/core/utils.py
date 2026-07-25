@@ -7,7 +7,7 @@ import humanize
 
 from core.logs import setup_logging
 from core.models import ArgsModel, VideoFormat
-from core.process import ManagedProcess
+from processes import ManagedProcess
 from ui.i18n import get_windows_ui_language
 from ui.models import Lang
 
@@ -16,8 +16,8 @@ def get_supported_formats(ffmpeg: Path) -> list[VideoFormat]:
     res = ManagedProcess(
         f"FFMpeg",
         [ffmpeg, "-formats"],
-        error_flags=(),
-        output_log_level="DEBUG",
+        error_flags=frozenset(),
+        log_level="DEBUG",
         capture_output=True,
     ).run()
 

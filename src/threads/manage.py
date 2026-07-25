@@ -6,7 +6,7 @@ import humanize
 from loguru import logger
 from PySide6.QtCore import QRunnable, Slot
 
-from threads.workers.task_worker import TaskWorker
+from workers.task_worker import TaskWorker
 
 DEFAULT_MAX_WORKERS = 16
 
@@ -87,7 +87,7 @@ def __run_in_thread_pool(
     return is_success
 
 
-class TaskManager:
+class TaskScheduler:
     def __init__(self) -> None:
         self._tasks: list[TaskWorker] = []
 
